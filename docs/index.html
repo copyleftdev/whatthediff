@@ -1,0 +1,694 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WhatTheDiff — semantic diff, drift &amp; outlier detection CLI</title>
+<meta name="description" content="Open-source CLI that compares hundreds of configs, JSON or YAML files at once: finds consensus, ranks drift, flags outliers, and proves every claim with evidence. 23µs per file. Linux, macOS, Windows.">
+<link rel="canonical" href="https://copyleftdev.github.io/whatthediff/">
+<meta name="theme-color" content="#fcfcfd">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="WhatTheDiff">
+<meta property="og:title" content="WhatTheDiff — the diff that answers “what actually matters?”">
+<meta property="og:description" content="Point it at N files. It finds the consensus, ranks the drift, flags the outlier — and proves it. 23µs/file, measured to 200,000 artifacts.">
+<meta property="og:url" content="https://copyleftdev.github.io/whatthediff/">
+<meta property="og:image" content="https://copyleftdev.github.io/whatthediff/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="WhatTheDiff — deterministic semantic diff CLI showing a drift report with a flagged outlier">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="WhatTheDiff — the diff that answers “what actually matters?”">
+<meta name="twitter:description" content="Consensus, drift and outliers across N files — with evidence for every claim. 23µs/file. Zero dependencies.">
+<meta name="twitter:image" content="https://copyleftdev.github.io/whatthediff/og.png">
+
+<!-- Structured data for search engines and LLM crawlers -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "WhatTheDiff",
+      "alternateName": "wtd",
+      "applicationCategory": "DeveloperApplication",
+      "operatingSystem": "Linux, macOS, Windows",
+      "softwareVersion": "0.1.0",
+      "description": "Deterministic semantic diff for N artifacts: compares many configs, JSON, YAML or text files at once, finds consensus, ranks drift, flags outliers, and backs every claim with inspectable evidence. The deterministic engine is the source of truth; an AI only explains what the engine proved.",
+      "url": "https://copyleftdev.github.io/whatthediff/",
+      "downloadUrl": "https://github.com/copyleftdev/whatthediff/releases/latest",
+      "installUrl": "https://copyleftdev.github.io/whatthediff/#install",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+      "author": { "@type": "Person", "name": "copyleftdev", "url": "https://github.com/copyleftdev" },
+      "sameAs": ["https://github.com/copyleftdev/whatthediff"]
+    },
+    {
+      "@type": "SoftwareSourceCode",
+      "name": "whatthediff",
+      "codeRepository": "https://github.com/copyleftdev/whatthediff",
+      "programmingLanguage": "Zig",
+      "runtimePlatform": "Native (static binaries)",
+      "targetProduct": { "@type": "SoftwareApplication", "name": "WhatTheDiff" }
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What is WhatTheDiff?",
+          "acceptedAnswer": { "@type": "Answer", "text": "WhatTheDiff (wtd) is an open-source command-line tool that compares an arbitrary number of files at once — configs, JSON, YAML, Markdown, logs — and reports what they agree on (consensus), how far each file deviates (drift), which files are outliers, and the exact evidence (file + line) behind every claim." }
+        },
+        {
+          "@type": "Question",
+          "name": "How is WhatTheDiff different from diff or git diff?",
+          "acceptedAnswer": { "@type": "Answer", "text": "diff and git diff compare two files line by line and answer 'what changed?'. WhatTheDiff compares N files by meaning and answers 'what actually matters?'. It decomposes files into semantic primitives, so JSON key order, whitespace, quoting and comments never register as differences, and it works across a whole corpus rather than a pair." }
+        },
+        {
+          "@type": "Question",
+          "name": "How fast is WhatTheDiff?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Measured at roughly 23 microseconds per file with flat, linear scaling from 1,000 to 200,000 files (a 200,000-file corpus completes in about 4.6 seconds). Benchmarks assert correctness too: every planted outlier is found with zero false positives at every size." }
+        },
+        {
+          "@type": "Question",
+          "name": "Does WhatTheDiff use AI?",
+          "acceptedAnswer": { "@type": "Answer", "text": "The comparison engine is fully deterministic — no AI, no embeddings, no randomness. Same corpus in, byte-identical report out. An AI adapter is on the roadmap for explaining the evidence graph, but the engine remains the only source of truth." }
+        },
+        {
+          "@type": "Question",
+          "name": "How do I install WhatTheDiff?",
+          "acceptedAnswer": { "@type": "Answer", "text": "One line on Linux, macOS or Git Bash: curl -fsSL https://raw.githubusercontent.com/copyleftdev/whatthediff/main/install.sh | sh — or on Windows PowerShell: irm https://raw.githubusercontent.com/copyleftdev/whatthediff/main/install.ps1 | iex. Both verify the SHA256 checksum before installing. Static binaries for six platforms are also on the GitHub Releases page." }
+        },
+        {
+          "@type": "Question",
+          "name": "What file formats does WhatTheDiff understand?",
+          "acceptedAnswer": { "@type": "Answer", "text": "JSON (fully parsed), YAML-style configs, INI/env/TOML-style key-value files, Markdown, and any text file as a fallback. Malformed input degrades gracefully to line-based comparison instead of failing." }
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:ital,wght@0,400..900;1,400..900&family=Fragment+Mono:ital@0;1&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    /* Radix Colors — light scale (slate / blue / grass / amber / iris / tomato) */
+    --slate-1:#fcfcfd; --slate-2:#f9f9fb; --slate-3:#f0f0f3; --slate-4:#e8e8ec;
+    --slate-5:#e0e1e6; --slate-6:#d9d9e0; --slate-7:#cdced6; --slate-8:#b9bbc6;
+    --slate-9:#8b8d98; --slate-10:#80838d; --slate-11:#60646c; --slate-12:#1c2024;
+    --blue-3:#e6f4fe; --blue-4:#d5efff; --blue-9:#0090ff; --blue-10:#0588f0;
+    --blue-11:#0d74ce; --blue-12:#113264;
+    --grass-3:#e9f6e9; --grass-9:#46a758; --grass-11:#2a7e3b;
+    --amber-3:#fff7c2; --amber-11:#ab6400;
+    --iris-3:#f0f1fe; --iris-11:#5753c6;
+    --tomato-3:#feebe7; --tomato-11:#d13415;
+
+    --sans:"Schibsted Grotesk",ui-sans-serif,system-ui,sans-serif;
+    --mono:"Fragment Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+
+    --space-xs:4px; --space-sm:8px; --space-md:16px; --space-lg:24px;
+    --space-xl:32px; --space-2xl:48px; --space-3xl:64px; --space-4xl:96px;
+
+    --radius-sm:6px; --radius-md:10px; --radius-lg:14px;
+    --border:1px solid var(--slate-4);
+    --maxw:1100px;
+  }
+
+  * { box-sizing:border-box; margin:0; }
+  html { scroll-behavior:smooth; scroll-padding-top:80px; }
+  @media (prefers-reduced-motion:reduce){ html { scroll-behavior:auto; } }
+
+  body {
+    font-family:var(--sans);
+    background:var(--slate-1);
+    color:var(--slate-12);
+    line-height:1.6;
+    font-size:16px;
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+  }
+
+  a { color:var(--blue-11); text-decoration:none; }
+  a:hover { text-decoration:underline; text-underline-offset:3px; }
+  ::selection { background:var(--blue-4); }
+
+  .wrap { max-width:var(--maxw); margin-inline:auto; padding-inline:var(--space-lg); }
+
+  svg.icon { width:15px; height:15px; flex:none; }
+
+  /* ---------- nav ---------- */
+  header.site {
+    position:sticky; top:0; z-index:10;
+    background:color-mix(in srgb, var(--slate-1) 88%, transparent);
+    backdrop-filter:blur(8px);
+    border-bottom:var(--border);
+  }
+  header.site .wrap {
+    display:flex; align-items:center; gap:var(--space-lg);
+    height:56px;
+  }
+  .wordmark { display:flex; align-items:center; gap:10px; font-weight:800; letter-spacing:-0.02em; color:var(--slate-12); font-size:1.0625rem; }
+  .wordmark:hover { text-decoration:none; }
+  .wordmark svg { width:22px; height:22px; }
+  nav.main { display:flex; gap:var(--space-lg); margin-left:auto; align-items:center; }
+  nav.main a { color:var(--slate-11); font-size:0.9375rem; font-weight:500; }
+  nav.main a:hover { color:var(--slate-12); text-decoration:none; }
+  nav.main a.gh { display:flex; align-items:center; gap:6px; color:var(--slate-12); }
+  @media (max-width:720px){ nav.main a.hide-sm { display:none; } }
+
+  /* ---------- hero ---------- */
+  .hero { padding-block:var(--space-4xl) var(--space-3xl); }
+  .hero .wrap {
+    display:grid; grid-template-columns:minmax(0,5fr) minmax(0,6fr);
+    gap:var(--space-3xl); align-items:center;
+  }
+  @media (max-width:900px){ .hero .wrap { grid-template-columns:1fr; gap:var(--space-2xl); } }
+
+  .eyebrow {
+    display:inline-flex; align-items:center; gap:8px;
+    font-size:0.8125rem; font-weight:600; letter-spacing:0.02em;
+    color:var(--blue-11); background:var(--blue-3);
+    border-radius:999px; padding:4px 12px;
+  }
+  h1 {
+    margin-top:var(--space-md);
+    font-size:clamp(2.35rem, 4.8vw, 3.25rem);
+    line-height:1.06; font-weight:800; letter-spacing:-0.033em;
+    text-wrap:balance;
+  }
+  .hero p.lede {
+    margin-top:var(--space-lg);
+    font-size:1.125rem; color:var(--slate-11); max-width:46ch;
+  }
+  .hero p.lede strong { color:var(--slate-12); font-weight:600; }
+
+  .install-box {
+    margin-top:var(--space-xl);
+    display:flex; align-items:center; gap:var(--space-sm);
+    background:var(--slate-2); border:var(--border); border-radius:var(--radius-md);
+    padding:10px 10px 10px 14px;
+    font-family:var(--mono); font-size:0.8125rem; color:var(--slate-12);
+    max-width:560px;
+  }
+  .install-box code { overflow-x:auto; white-space:nowrap; scrollbar-width:none; flex:1; }
+  .install-box code::-webkit-scrollbar { display:none; }
+  .install-box .dollar { color:var(--slate-9); user-select:none; }
+  button.copy {
+    display:flex; align-items:center; gap:6px;
+    font-family:var(--sans); font-size:0.8125rem; font-weight:600;
+    color:var(--slate-1); background:var(--slate-12);
+    border:none; border-radius:var(--radius-sm); padding:7px 12px; cursor:pointer;
+    transition:background .15s ease;
+  }
+  button.copy:hover { background:var(--slate-11); }
+  button.copy.done { background:var(--grass-9); }
+
+  .hero-links { margin-top:var(--space-md); display:flex; gap:var(--space-lg); align-items:center; font-size:0.9375rem; flex-wrap:wrap; }
+  .hero-links a { display:inline-flex; align-items:center; gap:6px; font-weight:600; white-space:nowrap; }
+  .hero-links .plat { color:var(--slate-9); font-size:0.8125rem; }
+
+  /* ---------- terminal ---------- */
+  .term {
+    background:var(--slate-2);
+    border:var(--border); border-radius:var(--radius-lg);
+    box-shadow:0 1px 2px rgba(28,32,36,.04), 0 8px 32px rgba(28,32,36,.06);
+    overflow:hidden;
+  }
+  .term-bar {
+    display:flex; align-items:center; gap:6px;
+    padding:10px 14px; border-bottom:var(--border); background:var(--slate-1);
+  }
+  .term-bar i { width:10px; height:10px; border-radius:50%; background:var(--slate-5); }
+  .term-bar span { margin-left:8px; font-family:var(--mono); font-size:0.6875rem; color:var(--slate-9); }
+  .term pre {
+    padding:var(--space-md) var(--space-lg);
+    font-family:var(--mono); font-size:0.75rem; line-height:1.75;
+    overflow-x:auto; color:var(--slate-11);
+  }
+  .term .cmd { color:var(--slate-12); font-weight:400; }
+  .term .dim { color:var(--slate-9); }
+  .term .hd  { color:var(--slate-12); }
+  .term .bad { color:var(--tomato-11); }
+  .term .num { color:var(--blue-11); }
+  .term .ok  { color:var(--grass-11); }
+
+  /* ---------- stat strip ---------- */
+  .stats { border-block:var(--border); background:var(--slate-2); }
+  .stats .wrap {
+    display:flex; flex-wrap:wrap; gap:var(--space-md) var(--space-xl);
+    padding-block:var(--space-lg); justify-content:space-between;
+  }
+  .stat { display:flex; flex-direction:column; gap:2px; }
+  .stat b { font-family:var(--mono); font-size:1rem; font-weight:400; color:var(--slate-12); }
+  .stat span { font-size:0.8125rem; color:var(--slate-10); }
+
+  /* ---------- sections ---------- */
+  section { padding-block:var(--space-4xl); }
+  section h2 {
+    font-size:clamp(1.65rem, 3vw, 2.1rem); font-weight:800; letter-spacing:-0.025em; line-height:1.15;
+  }
+  section p.sub { margin-top:var(--space-sm); color:var(--slate-11); max-width:60ch; }
+  .kicker { font-family:var(--mono); font-size:0.75rem; color:var(--blue-11); letter-spacing:0.08em; text-transform:uppercase; }
+
+  /* pipeline */
+  .pipeline {
+    margin-top:var(--space-2xl);
+    display:flex; flex-wrap:wrap; gap:var(--space-sm); align-items:center;
+    font-family:var(--mono); font-size:0.8125rem;
+  }
+  .pipeline .stage {
+    background:var(--slate-1); border:var(--border); border-radius:999px;
+    padding:6px 14px; color:var(--slate-12); white-space:nowrap;
+  }
+  .pipeline .arrow { color:var(--slate-8); user-select:none; }
+
+  /* buckets */
+  .buckets { margin-top:var(--space-2xl); display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:var(--space-md); }
+  .bucket { border:var(--border); border-radius:var(--radius-md); padding:var(--space-md) var(--space-lg); background:var(--slate-1); }
+  .bucket .chip {
+    display:inline-block; font-family:var(--mono); font-size:0.75rem;
+    border-radius:4px; padding:2px 8px; margin-bottom:var(--space-sm);
+  }
+  .bucket p { font-size:0.875rem; color:var(--slate-11); }
+  .bucket .k { font-family:var(--mono); font-size:0.75rem; color:var(--slate-9); display:block; margin-top:var(--space-sm); }
+  .chip.universal { background:var(--grass-3); color:var(--grass-11); }
+  .chip.majority  { background:var(--blue-3);  color:var(--blue-11); }
+  .chip.minority  { background:var(--amber-3); color:var(--amber-11); }
+  .chip.unique    { background:var(--iris-3);  color:var(--iris-11); }
+  .formula {
+    margin-top:var(--space-lg); font-family:var(--mono); font-size:0.8125rem;
+    color:var(--slate-11); background:var(--slate-2); border:var(--border);
+    border-radius:var(--radius-sm); padding:10px 14px; display:inline-block;
+  }
+
+  /* features — asymmetric rows, not a card grid */
+  .features { margin-top:var(--space-2xl); display:grid; grid-template-columns:1fr 1fr; gap:var(--space-2xl) var(--space-4xl); }
+  @media (max-width:760px){ .features { grid-template-columns:1fr; } }
+  .feature { display:grid; grid-template-columns:15px 1fr; gap:var(--space-md); align-items:start; }
+  .feature svg { margin-top:5px; color:var(--blue-11); }
+  .feature h3 { font-size:1.0625rem; font-weight:700; letter-spacing:-0.01em; }
+  .feature p { margin-top:4px; font-size:0.9375rem; color:var(--slate-11); }
+  .feature p code { font-family:var(--mono); font-size:0.8125em; background:var(--slate-3); border-radius:4px; padding:1px 5px; }
+
+  /* benchmarks */
+  .tablewrap { margin-top:var(--space-xl); overflow-x:auto; border:var(--border); border-radius:var(--radius-md); }
+  table { border-collapse:collapse; width:100%; font-size:0.875rem; min-width:560px; }
+  th, td { text-align:right; padding:10px 18px; border-bottom:var(--border); }
+  th:first-child, td:first-child { text-align:left; }
+  thead th { font-size:0.75rem; text-transform:uppercase; letter-spacing:0.06em; color:var(--slate-10); font-weight:600; background:var(--slate-2); }
+  td { font-family:var(--mono); font-size:0.8125rem; color:var(--slate-12); }
+  tbody tr:last-child td { border-bottom:none; }
+  td .pass { color:var(--grass-11); }
+  .bench-note { margin-top:var(--space-md); font-size:0.875rem; color:var(--slate-10); max-width:70ch; }
+
+  /* install */
+  #install { background:var(--slate-2); border-block:var(--border); }
+  .oses { margin-top:var(--space-2xl); display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:var(--space-lg); }
+  .os { background:var(--slate-1); border:var(--border); border-radius:var(--radius-md); padding:var(--space-lg); }
+  .os h3 { font-size:1rem; font-weight:700; display:flex; align-items:center; gap:8px; }
+  .os h3 small { font-weight:500; color:var(--slate-9); font-size:0.8125rem; }
+  .os pre {
+    margin-top:var(--space-md); font-family:var(--mono); font-size:0.71rem; line-height:1.7;
+    background:var(--slate-2); border:var(--border); border-radius:var(--radius-sm);
+    padding:12px 14px; overflow-x:auto; color:var(--slate-12); white-space:pre;
+  }
+  .os p { margin-top:var(--space-sm); font-size:0.8125rem; color:var(--slate-10); }
+  .verify {
+    margin-top:var(--space-lg); display:flex; gap:10px; align-items:flex-start;
+    font-size:0.875rem; color:var(--slate-11); max-width:72ch;
+  }
+  .verify svg { color:var(--grass-9); margin-top:4px; }
+
+  /* faq */
+  .faq { margin-top:var(--space-xl); max-width:760px; }
+  details { border-bottom:var(--border); }
+  details summary {
+    cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center;
+    gap:var(--space-md); padding-block:var(--space-md); font-weight:600; font-size:1rem;
+  }
+  details summary > span:first-child { flex:1; }
+  details summary::-webkit-details-marker { display:none; }
+  details summary::after { content:"+"; font-family:var(--mono); color:var(--slate-9); font-size:1rem; }
+  details[open] summary::after { content:"−"; }
+  details p { padding-bottom:var(--space-lg); color:var(--slate-11); font-size:0.9375rem; max-width:65ch; }
+  details p code { font-family:var(--mono); font-size:0.8125em; background:var(--slate-3); border-radius:4px; padding:1px 5px; }
+
+  /* footer */
+  footer { border-top:var(--border); padding-block:var(--space-2xl); }
+  footer .wrap { display:flex; flex-wrap:wrap; gap:var(--space-md) var(--space-2xl); align-items:center; font-size:0.875rem; color:var(--slate-10); }
+  footer nav { display:flex; gap:var(--space-lg); margin-left:auto; flex-wrap:wrap; }
+  footer a { color:var(--slate-11); }
+
+  /* motion — one orchestrated entrance */
+  @media (prefers-reduced-motion:no-preference){
+    .hero .rise { opacity:0; transform:translateY(10px); animation:rise .7s cubic-bezier(.16,1,.3,1) forwards; }
+    .hero .rise:nth-child(2){ animation-delay:.07s } .hero .rise:nth-child(3){ animation-delay:.14s }
+    .hero .rise:nth-child(4){ animation-delay:.21s } .hero .rise:nth-child(5){ animation-delay:.28s }
+    .hero .term { opacity:0; transform:translateY(14px); animation:rise .8s .2s cubic-bezier(.16,1,.3,1) forwards; }
+    @keyframes rise { to { opacity:1; transform:none; } }
+  }
+</style>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <a class="wordmark" href="#" aria-label="WhatTheDiff home">
+      <svg viewBox="0 0 32 32" fill="none" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#0090ff"/><rect x="7" y="9" width="18" height="3" rx="1.5" fill="#fcfcfd"/><rect x="7" y="15" width="11" height="3" rx="1.5" fill="#fcfcfd" opacity=".65"/><rect x="7" y="21" width="15" height="3" rx="1.5" fill="#fcfcfd"/></svg>
+      WhatTheDiff
+    </a>
+    <nav class="main" aria-label="Main">
+      <a class="hide-sm" href="#how">How it works</a>
+      <a class="hide-sm" href="#bench">Benchmarks</a>
+      <a class="hide-sm" href="#faq">FAQ</a>
+      <a href="#install">Install</a>
+      <a class="gh" href="https://github.com/copyleftdev/whatthediff" aria-label="WhatTheDiff on GitHub">
+        <svg class="icon" viewBox="0 0 15 15" fill="none" aria-hidden="true"><path d="M7.49902 0.25C11.5033 0.25 14.7499 3.4958 14.75 7.5C14.75 10.7023 12.6746 13.418 9.7959 14.3789C9.42852 14.4496 9.29802 14.2242 9.29785 14.0303C9.29785 13.7926 9.30664 13.0099 9.30664 12.041C9.30657 11.3647 9.07434 10.9221 8.81445 10.6982C10.4292 10.5189 12.125 9.90632 12.125 7.12109C12.125 6.32946 11.8444 5.68268 11.3799 5.17578C11.4542 4.99237 11.7023 4.25509 11.3066 3.25684C11.2917 3.25225 10.6824 3.07392 9.31543 4C8.73639 3.83933 8.11598 3.75897 7.5 3.75586C6.88373 3.75899 6.26356 3.83939 5.68555 4C4.30048 3.06223 3.69141 3.25684 3.69141 3.25684C3.29667 4.25506 3.54533 4.99237 3.62012 5.17578C3.15651 5.68268 2.87402 6.32946 2.87402 7.12109C2.87404 9.89919 4.56694 10.5207 6.17676 10.7041C5.96986 10.8852 5.78272 11.2049 5.7168 11.6729C5.3038 11.8584 4.25315 12.1788 3.60645 11.0713C3.60645 11.0713 3.2236 10.3756 2.49609 10.3242C2.49609 10.3242 1.78803 10.3151 2.44629 10.7646C2.46065 10.7715 2.92629 11.0006 3.25098 11.8252C3.25565 11.8405 3.6878 13.2324 5.69336 12.7969C5.69692 13.4017 5.70312 13.858 5.70312 14.0303C5.70295 14.2225 5.57051 14.4462 5.20801 14.3799C2.32708 13.4207 0.25 10.7027 0.25 7.5C0.250136 3.49591 3.49627 0.250167 7.49902 0.25Z" fill="currentColor"/></svg>
+        GitHub
+      </a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="hero">
+    <div class="wrap">
+      <div>
+        <span class="eyebrow rise">Deterministic semantic diff · v0.1.0</span>
+        <h1 class="rise">The diff that answers<br>“what actually matters?”</h1>
+        <p class="lede rise">Point <strong>wtd</strong> at a directory of configs, contracts, or JSON.
+        It finds the <strong>consensus</strong>, ranks the <strong>drift</strong>, flags the
+        <strong>outlier</strong> — and shows the evidence behind every claim.</p>
+
+        <div class="install-box rise">
+          <span class="dollar" aria-hidden="true">$</span>
+          <code id="install-cmd">curl -fsSL https://raw.githubusercontent.com/copyleftdev/whatthediff/main/install.sh | sh</code>
+          <button class="copy" data-copy="#install-cmd" aria-label="Copy install command">
+            <svg class="icon" viewBox="0 0 15 15" fill="none" aria-hidden="true"><path d="M10 4.00003V2.50003C10 2.22389 9.77614 2.00003 9.5 2.00003H2.5C2.22386 2.00003 2 2.22389 2 2.50003V9.50003C2 9.77617 2.22386 10 2.5 10H4V5.50003C4 4.6716 4.67157 4.00003 5.5 4.00003H10ZM5.5 5.00003C5.22386 5.00003 5 5.22389 5 5.50003V12.5C5.00002 12.7762 5.22387 13 5.5 13H12.5C12.7761 13 13 12.7762 13 12.5V5.50003C13 5.22389 12.7761 5.00003 12.5 5.00003H5.5ZM12.5 4.00003C13.3284 4.00003 14 4.6716 14 5.50003V12.5C14 13.3284 13.3284 14 12.5 14H5.5C4.67159 14 4.00002 13.3284 4 12.5V11H2.5C1.67157 11 1 10.3285 1 9.50003V2.50003C1 1.6716 1.67157 1.00003 2.5 1.00003H9.5C10.3284 1.00003 11 1.6716 11 2.50003V4.00003H12.5Z" fill="currentColor"/></svg>
+            Copy
+          </button>
+        </div>
+
+        <div class="hero-links rise">
+          <a href="https://github.com/copyleftdev/whatthediff/releases/latest">
+            <svg class="icon" viewBox="0 0 15 15" fill="none" aria-hidden="true"><path d="M12.5 10.0002C12.7761 10.0002 13 10.224 13 10.5002V12.0002C12.9999 13.1042 12.106 14.0002 11.001 14.0002H3.99609C2.89012 14 2.0001 13.103 2 12.0002V10.5002C2 10.224 2.22386 10.0002 2.5 10.0002C2.77614 10.0002 3 10.224 3 10.5002V12.0002C3.0001 12.5539 3.44557 13 3.99609 13.0002H11.001C11.5527 13.0002 11.9999 12.5529 12 12.0002V10.5002C12 10.224 12.2239 10.0002 12.5 10.0002ZM7.5 1.04999C7.74853 1.04999 7.9502 1.25165 7.9502 1.50018V8.41327L10.1816 6.18182C10.3574 6.00609 10.6426 6.00609 10.8184 6.18182C10.994 6.35757 10.9941 6.64283 10.8184 6.81854L7.81836 9.81854C7.64264 9.99413 7.35734 9.99416 7.18164 9.81854L4.18164 6.81854C4.00595 6.64285 4.00603 6.35757 4.18164 6.18182C4.35738 6.00609 4.64262 6.00609 4.81836 6.18182L7.0498 8.41327V1.50018C7.0498 1.25167 7.25149 1.05001 7.5 1.04999Z" fill="currentColor"/></svg>
+            Download binaries
+          </a>
+          <span class="plat">Linux · macOS · Windows — static, ~300&nbsp;KB, zero&nbsp;deps</span>
+        </div>
+      </div>
+
+      <figure class="term" aria-label="Real wtd output on a five-file corpus">
+        <div class="term-bar" aria-hidden="true"><i></i><i></i><i></i><span>wtd configs/ — 5 artifacts</span></div>
+        <pre><span class="dim">$</span> <span class="cmd">wtd configs/</span>
+<span class="hd">WhatTheDiff — corpus analysis</span>
+Corpus: 5 artifacts · 12 distinct primitives · 34 observations
+
+<span class="hd">Consensus</span>
+  universal       2  <span class="dim">(present in all 5 artifacts)</span>
+  majority        5
+  unique          5
+  consensus core: 7 primitives
+
+<span class="hd">Drift</span> <span class="dim">(0 = pure consensus)</span>
+  <span class="num">0.727</span>  configs/svc-d.yaml   <span class="bad">⚠ OUTLIER</span>
+  <span class="num">0.375</span>  configs/svc-c.yaml
+  <span class="num">0.000</span>  configs/svc-a.yaml
+
+<span class="hd">Evidence — unique primitives</span>
+  configs/svc-d.yaml  <span class="dim">(4 unique)</span>
+    kv   <span class="bad">admin_backdoor=enabled</span>  <span class="dim">(line 7)</span>
+    kv   <span class="bad">tls=false</span>               <span class="dim">(line 5)</span>
+    kv   <span class="bad">db.host=10.9.9.9</span>        <span class="dim">(line 3)</span></pre>
+      </figure>
+    </div>
+  </div>
+
+  <div class="stats" role="list" aria-label="Measured performance">
+    <div class="wrap">
+      <div class="stat" role="listitem"><b>23 µs</b><span>per file, flat to 200k files</span></div>
+      <div class="stat" role="listitem"><b>200,000</b><span>files analyzed in 4.6 s</span></div>
+      <div class="stat" role="listitem"><b>4,000 / 4,000</b><span>planted outliers found, 0 false positives</span></div>
+      <div class="stat" role="listitem"><b>0</b><span>dependencies — one static binary</span></div>
+      <div class="stat" role="listitem"><b>byte-identical</b><span>same corpus in, same report out</span></div>
+    </div>
+  </div>
+
+  <section id="how">
+    <div class="wrap">
+      <span class="kicker">How it works</span>
+      <h2>Files in. Meaning out.</h2>
+      <p class="sub">wtd never compares raw text. Every artifact is decomposed into
+      <em>primitives</em> — stable semantic facts like <code style="font-family:var(--mono);font-size:.85em">$.db.port=5432</code> —
+      each hashed with BLAKE3, so key order, whitespace, quoting and comments never register as difference.</p>
+
+      <div class="pipeline" aria-label="Processing pipeline">
+        <span class="stage">artifacts</span><span class="arrow">→</span>
+        <span class="stage">normalize</span><span class="arrow">→</span>
+        <span class="stage">extract primitives</span><span class="arrow">→</span>
+        <span class="stage">canonical form</span><span class="arrow">→</span>
+        <span class="stage">BLAKE3 identity</span><span class="arrow">→</span>
+        <span class="stage">evidence store</span><span class="arrow">→</span>
+        <span class="stage">consensus</span><span class="arrow">→</span>
+        <span class="stage">drift</span><span class="arrow">→</span>
+        <span class="stage">report</span>
+      </div>
+
+      <div class="buckets">
+        <div class="bucket">
+          <span class="chip universal">universal</span>
+          <p>Facts every artifact agrees on. Your ground truth.</p>
+          <span class="k">k = N</span>
+        </div>
+        <div class="bucket">
+          <span class="chip majority">majority</span>
+          <p>The consensus core — held by most, missing from a few.</p>
+          <span class="k">2k &gt; N</span>
+        </div>
+        <div class="bucket">
+          <span class="chip minority">minority</span>
+          <p>Factions. A subset quietly doing its own thing.</p>
+          <span class="k">1 &lt; k, 2k ≤ N</span>
+        </div>
+        <div class="bucket">
+          <span class="chip unique">unique</span>
+          <p>Facts found in exactly one artifact. Where outliers hide.</p>
+          <span class="k">k = 1</span>
+        </div>
+      </div>
+
+      <div class="formula">drift(A) = 1 − Jaccard(A, consensus core) · outlier ⇢ mean + 1.5σ</div>
+    </div>
+  </section>
+
+  <section id="features" style="padding-top:0">
+    <div class="wrap">
+      <span class="kicker">Principles</span>
+      <h2>Evidence, not vibes.</h2>
+
+      <div class="features">
+        <div class="feature">
+          <svg class="icon" viewBox="0 0 15 15" fill="none" aria-hidden="true"><path d="M5.5 3C4.67157 3 4 2.32843 4 1.5C4 0.671573 4.67157 0 5.5 0C6.32843 0 7 0.671573 7 1.5C7 2.32843 6.32843 3 5.5 3ZM3 5.5C3 6.32843 2.32843 7 1.5 7C0.671573 7 0 6.32843 0 5.5C0 4.67157 0.671573 4 1.5 4C2.32843 4 3 4.67157 3 5.5ZM3 13.5C3 14.3284 2.32843 15 1.5 15C0.671573 15 0 14.3284 0 13.5C0 12.6716 0.671573 12 1.5 12C2.32843 12 3 12.6716 3 13.5ZM13.5 3C12.6716 3 12 2.32843 12 1.5C12 0.671573 12.6716 0 13.5 0C14.3284 0 15 0.671573 15 1.5C15 2.32843 14.3284 3 13.5 3ZM15 13.5C15 14.3284 14.3284 15 13.5 15C12.6716 15 12 14.3284 12 13.5C12 12.6716 12.6716 12 13.5 12C14.3284 12 15 12.6716 15 13.5ZM5.5 15C4.67157 15 4 14.3284 4 13.5C4 12.6716 4.67157 12 5.5 12C6.32843 12 7 12.6716 7 13.5C7 14.3284 6.32843 15 5.5 15ZM9.5 15C8.67157 15 8 14.3284 8 13.5C8 12.6716 8.67157 12 9.5 12C10.3284 12 11 12.6716 11 13.5C11 14.3284 10.3284 15 9.5 15ZM15 9.5C15 10.3284 14.3284 11 13.5 11C12.6716 11 12 10.3284 12 9.5C12 8.67157 12.6716 8 13.5 8C14.3284 8 15 8.67157 15 9.5ZM3 9.5C3 10.3284 2.32843 11 1.5 11C0.671573 11 0 10.3284 0 9.5C0 8.67157 0.671573 8 1.5 8C2.32843 8 3 8.67157 3 9.5ZM9.5 3C8.67157 3 8 2.32843 8 1.5C8 0.671573 8.67157 0 9.5 0C10.3284 0 11 0.671573 11 1.5C11 2.32843 10.3284 3 9.5 3ZM7.5 9C8.32843 9 9 8.32843 9 7.5C9 6.67157 8.32843 6 7.5 6C6.67157 6 6 6.67157 6 7.5C6 8.32843 6.67157 9 7.5 9Z" fill="currentColor" opacity=".9"/></svg>
+          <div>
+            <h3>Meaning over syntax</h3>
+            <p>JSON parsed leaf-by-leaf, YAML and configs as key paths, Markdown by structure.
+            Reordering keys or reformatting a file changes <em>nothing</em> in the report.</p>
+          </div>
+        </div>
+        <div class="feature">
+          <svg class="icon" viewBox="0 0 15 15" fill="none" aria-hidden="true"><path d="M10 6.5C10 8.433 8.433 10 6.5 10C4.567 10 3 8.433 3 6.5C3 4.567 4.567 3 6.5 3C8.433 3 10 4.567 10 6.5ZM9.30884 10.0159C8.53901 10.6318 7.56251 11 6.5 11C4.01472 11 2 8.98528 2 6.5C2 4.01472 4.01472 2 6.5 2C8.98528 2 11 4.01472 11 6.5C11 7.56251 10.6318 8.53901 10.0159 9.30884L12.8536 12.1464C13.0488 12.3417 13.0488 12.6583 12.8536 12.8536C12.6583 13.0488 12.3417 13.0488 12.1464 12.8536L9.30884 10.0159Z" fill="currentColor"/></svg>
+          <div>
+            <h3>Every claim is inspectable</h3>
+            <p>Each observation keeps its full occurrence list — artifact and line.
+            The report never asserts anything you can't open a file and check.</p>
+          </div>
+        </div>
+        <div class="feature">
+          <svg class="icon" viewBox="0 0 15 15" fill="none" aria-hidden="true"><path d="M7.5 0C7.77614 0 8 0.223858 8 0.5V1.80687C10.6922 2.0935 12.9065 4.30784 13.1931 7H14.5C14.7761 7 15 7.22386 15 7.5C15 7.77614 14.7761 8 14.5 8H13.1931C12.9065 10.6922 10.6922 12.9065 8 13.1931V14.5C8 14.7761 7.77614 15 7.5 15C7.22386 15 7 14.7761 7 14.5V13.1931C4.30784 12.9065 2.0935 10.6922 1.80687 8H0.5C0.223858 8 0 7.77614 0 7.5C0 7.22386 0.223858 7 0.5 7H1.80687C2.0935 4.30784 4.30784 2.0935 7 1.80687V0.5C7 0.223858 7.22386 0 7.5 0ZM8 12.1873V10.5C8 10.2239 7.77614 10 7.5 10C7.22386 10 7 10.2239 7 10.5V12.1873C4.86033 11.9106 3.08938 10.1397 2.81273 8H4.5C4.77614 8 5 7.77614 5 7.5C5 7.22386 4.77614 7 4.5 7H2.81273C3.08938 4.86033 4.86033 3.08938 7 2.81273V4.5C7 4.77614 7.22386 5 7.5 5C7.77614 5 8 4.77614 8 4.5V2.81273C10.1397 3.08938 11.9106 4.86033 12.1873 7H10.5C10.2239 7 10 7.22386 10 7.5C10 7.77614 10.2239 8 10.5 8H12.1873C11.9106 10.1397 10.1397 11.9106 8 12.1873Z" fill="currentColor"/></svg>
+          <div>
+            <h3>Deterministic to the byte</h3>
+            <p>No AI in the engine, no randomness, no hidden state. Same corpus in,
+            byte-identical report out — property-tested across 565 seeded iterations.</p>
+          </div>
+        </div>
+        <div class="feature">
+          <svg class="icon" viewBox="0 0 15 15" fill="none" aria-hidden="true"><path d="M8.15623 0.136828C8.29885 0.0017736 8.5108 -0.038992 8.69627 0.0401498C8.90813 0.130807 9.03093 0.354826 8.99314 0.582135L8.08983 6.00004H12.4999C12.6893 6.00004 12.8625 6.10703 12.9472 6.2764C13.0318 6.44567 13.0137 6.64836 12.9003 6.79983L6.90039 14.7997C6.76218 14.984 6.51554 15.0503 6.30372 14.9599C6.09185 14.8692 5.96904 14.6452 6.00685 14.4179L6.91016 9H2.50005C2.31067 9 2.13749 8.89303 2.05279 8.72364C1.96818 8.55437 1.98625 8.35167 2.09967 8.20021L8.09959 0.200304L8.15623 0.136828ZM3.50004 8.00001H7.49999C7.64696 8.00001 7.78682 8.06464 7.88182 8.17677C7.9767 8.28885 8.01724 8.43718 7.99315 8.58204L7.33007 12.5586L11.4999 7.00003H7.49999C7.35302 7.00003 7.21316 6.93541 7.11816 6.82327C7.02329 6.71118 6.98274 6.56286 7.00683 6.418L7.66894 2.44051L3.50004 8.00001Z" fill="currentColor"/></svg>
+          <div>
+            <h3>Fast at any scale</h3>
+            <p>~23 µs per file with flat, linear scaling — measured, not estimated,
+            from 1,000 to 200,000 artifacts. Written in Zig with streaming-first design.</p>
+          </div>
+        </div>
+        <div class="feature">
+          <svg class="icon" viewBox="0 0 15 15" fill="none" aria-hidden="true"><path d="M7.28856 0.796908C7.42258 0.734364 7.57742 0.734364 7.71144 0.796908L13.7114 3.59691C13.8875 3.67906 14 3.85574 14 4.05V10.95C14 11.1443 13.8875 11.3209 13.7114 11.4031L7.71144 14.2031C7.57742 14.2656 7.42258 14.2656 7.28856 14.2031L1.28856 11.4031C1.11252 11.3209 1 11.1443 1 10.95V4.05C1 3.85574 1.11252 3.67906 1.28856 3.59691L7.28856 0.796908ZM2 4.80578L7 6.93078V13.0128L2 10.6795V4.80578ZM8 13.0128L13 10.6795V4.80578L8 6.93078V13.0128ZM7.5 6.05672L12.2719 4.02866L7.5 1.80172L2.72809 4.02866L7.5 6.05672Z" fill="currentColor"/></svg>
+          <div>
+            <h3>One small binary</h3>
+            <p>~300 KB, statically linked, zero dependencies. Fully static musl builds
+            on Linux — drop it in a container, a CI step, or an air-gapped box.</p>
+          </div>
+        </div>
+        <div class="feature">
+          <svg class="icon" viewBox="0 0 15 15" fill="none" aria-hidden="true"><path d="M3.5 2C3.22386 2 3 2.22386 3 2.5V12.5C3 12.7761 3.22386 13 3.5 13H11.5C11.7761 13 12 12.7761 12 12.5V6H8.5C8.22386 6 8 5.77614 8 5.5V2H3.5ZM9 2.70711L11.2929 5H9V2.70711ZM2 2.5C2 1.67157 2.67157 1 3.5 1H8.5C8.63261 1 8.75979 1.05268 8.85355 1.14645L12.8536 5.14645C12.9473 5.24021 13 5.36739 13 5.5V12.5C13 13.3284 12.3284 14 11.5 14H3.5C2.67157 14 2 13.3284 2 12.5V2.5Z" fill="currentColor"/></svg>
+          <div>
+            <h3>AI-ready evidence graph</h3>
+            <p><code>wtd --json</code> emits the full evidence graph (<code>wtd.report.v0</code>) —
+            a stable contract for pipelines, dashboards, or an LLM that explains
+            <em>why</em> a file drifted without ever inventing facts.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="bench" style="padding-top:0">
+    <div class="wrap">
+      <span class="kicker">Benchmarks</span>
+      <h2>Measured, and honest about the ceiling.</h2>
+      <p class="sub">The benchmark plants known rogues in generated corpora, then
+      <em>fails unless wtd flags exactly the planted set</em>. Speed without correctness doesn't count.</p>
+
+      <div class="tablewrap">
+        <table>
+          <caption class="sr-only" style="position:absolute;left:-9999px">Benchmark results by corpus size</caption>
+          <thead>
+            <tr><th scope="col">files</th><th scope="col">planted rogues</th><th scope="col">wall time</th><th scope="col">per file</th><th scope="col">detection</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>1,000</td><td>20</td><td>0.02 s</td><td>20 µs</td><td><span class="pass">exact · 0 false positives</span></td></tr>
+            <tr><td>10,000</td><td>200</td><td>0.22 s</td><td>22 µs</td><td><span class="pass">exact · 0 false positives</span></td></tr>
+            <tr><td>50,000</td><td>1,000</td><td>1.14 s</td><td>23 µs</td><td><span class="pass">exact · 0 false positives</span></td></tr>
+            <tr><td>200,000</td><td>4,000</td><td>4.63 s</td><td>23 µs</td><td><span class="pass">exact · 0 false positives</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="bench-note">ReleaseFast build on tmpfs, 2026-07-07. Memory is the current ceiling
+      (~9.6 KB resident per artifact), which is why a streaming evidence store is on the roadmap —
+      reproduce any row with <a href="https://github.com/copyleftdev/whatthediff/blob/main/scripts/bench.sh">scripts/bench.sh</a>.</p>
+    </div>
+  </section>
+
+  <section id="install">
+    <div class="wrap">
+      <span class="kicker">Install</span>
+      <h2>One line. Any OS. Checksum-verified.</h2>
+
+      <div class="oses">
+        <div class="os">
+          <h3>Linux <small>x86_64 · aarch64, fully static</small></h3>
+          <pre>curl -fsSL https://raw.githubusercontent.com/\
+copyleftdev/whatthediff/main/install.sh | sh</pre>
+          <p>Installs to <code style="font-family:var(--mono)">/usr/local/bin</code> or <code style="font-family:var(--mono)">~/.local/bin</code>.</p>
+        </div>
+        <div class="os">
+          <h3>macOS <small>Intel · Apple Silicon</small></h3>
+          <pre>curl -fsSL https://raw.githubusercontent.com/\
+copyleftdev/whatthediff/main/install.sh | sh</pre>
+          <p>Same script — it detects your OS and architecture.</p>
+        </div>
+        <div class="os">
+          <h3>Windows <small>x86_64 · aarch64</small></h3>
+          <pre>irm https://raw.githubusercontent.com/\
+copyleftdev/whatthediff/main/install.ps1 | iex</pre>
+          <p>PowerShell — installs and adds wtd to your user PATH.</p>
+        </div>
+      </div>
+
+      <div class="verify">
+        <svg class="icon" viewBox="0 0 15 15" fill="none" aria-hidden="true"><path d="M7.49915 0.877045C11.1566 0.877045 14.1218 3.84178 14.1222 7.49911C14.1222 11.1568 11.1568 14.1222 7.49915 14.1222C3.84181 14.1218 0.877075 11.1565 0.877075 7.49911C0.877486 3.84203 3.84206 0.877456 7.49915 0.877045ZM7.49915 1.82626C4.36673 1.82667 1.8267 4.3667 1.82629 7.49911C1.82629 10.6319 4.36648 13.1716 7.49915 13.172C10.6321 13.172 13.172 10.6321 13.172 7.49911C13.1716 4.36645 10.6319 1.82626 7.49915 1.82626ZM9.34094 4.96201C9.49988 4.73626 9.81241 4.68202 10.0382 4.84091C10.2639 4.99988 10.3182 5.31242 10.1593 5.53818L6.99231 10.0382C6.90692 10.1594 6.7719 10.236 6.62415 10.2481C6.47636 10.2602 6.33063 10.2064 6.22668 10.1007L4.64368 8.4874L5.00012 8.13779L5.35657 7.7872L6.51965 8.97079L9.34094 4.96201ZM4.64954 7.78036C4.84653 7.58696 5.16309 7.5903 5.35657 7.7872L4.64368 8.4874C4.45023 8.29035 4.4525 7.97382 4.64954 7.78036Z" fill="currentColor"/></svg>
+        <span>Both installers verify the download against the release's published
+        <code style="font-family:var(--mono);font-size:.85em">SHA256SUMS</code> before installing — and refuse on mismatch.
+        Pin a version with <code style="font-family:var(--mono);font-size:.85em">WTD_VERSION=v0.1.0</code>, or grab binaries yourself from
+        <a href="https://github.com/copyleftdev/whatthediff/releases/latest">GitHub Releases</a>.</span>
+      </div>
+    </div>
+  </section>
+
+  <section id="faq">
+    <div class="wrap">
+      <span class="kicker">FAQ</span>
+      <h2>Questions, answered plainly.</h2>
+      <div class="faq">
+        <details>
+          <summary><span>How is this different from <code style="font-family:var(--mono);font-size:.9em;background:none;padding:0">diff</code> or <code style="font-family:var(--mono);font-size:.9em;background:none;padding:0">git diff</code>?</span></summary>
+          <p>Those compare <em>two</em> files line-by-line and answer “what changed?”.
+          wtd compares <em>N</em> files by meaning and answers “what actually matters?” —
+          consensus, drift, outliers, and the evidence for each. Key order, whitespace
+          and comments never show up as differences.</p>
+        </details>
+        <details>
+          <summary>Does it use AI?</summary>
+          <p>Not in the engine. Comparison, consensus, drift and outlier detection are fully
+          deterministic — byte-identical output for the same corpus. An AI adapter is on the
+          roadmap for <em>explaining</em> the evidence graph, but it can never invent a finding.</p>
+        </details>
+        <details>
+          <summary>What formats does it understand?</summary>
+          <p>JSON (fully parsed), YAML-style configs, INI/env/TOML-style key-value files,
+          Markdown, and any text file as a fallback. Malformed input degrades gracefully
+          to line-based comparison instead of failing.</p>
+        </details>
+        <details>
+          <summary>How does outlier detection work?</summary>
+          <p>Every primitive held by a strict majority of files forms the consensus core.
+          A file's drift is 1 − Jaccard(its primitives, core); anything past mean + 1.5σ is
+          flagged. In benchmarks with planted rogues, detection is exact at every corpus size
+          — 4,000 of 4,000 found at 200k files, zero false positives.</p>
+        </details>
+        <details>
+          <summary>Can I trust the binaries?</summary>
+          <p>Releases are built in a public GitHub Actions workflow from tagged source, and
+          every asset ships with a <span style="font-family:var(--mono);font-size:.9em">SHA256SUMS</span> file.
+          The install scripts verify checksums before installing and refuse on mismatch.
+          It's also ~1,900 lines of Zig — small enough to read.</p>
+        </details>
+        <details>
+          <summary>What's on the roadmap?</summary>
+          <p><span style="font-family:var(--mono);font-size:.9em">wtd ask</span> (an AI adapter over the evidence graph),
+          cross-format canonical unification (same fact in JSON and YAML → same identity),
+          pairwise clustering to find factions, PDF/XML extractors, and a streaming evidence
+          store for millions of artifacts.</p>
+        </details>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>WhatTheDiff · deterministic by design</span>
+    <nav aria-label="Footer">
+      <a href="https://github.com/copyleftdev/whatthediff">GitHub</a>
+      <a href="https://github.com/copyleftdev/whatthediff/releases/latest">Releases</a>
+      <a href="https://github.com/copyleftdev/whatthediff/blob/main/intent.md">Design philosophy</a>
+      <a href="https://github.com/copyleftdev/whatthediff/issues">Report an issue</a>
+    </nav>
+  </div>
+  <div class="wrap" style="margin-top:12px">
+    <span style="font-size:0.78rem;color:var(--slate-9)">Colors &amp; icons from <a href="https://www.radix-ui.com" style="color:var(--slate-10)">Radix</a>, with thanks.</span>
+  </div>
+</footer>
+
+<script>
+  document.querySelectorAll("button.copy").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var text = document.querySelector(btn.dataset.copy).textContent;
+      navigator.clipboard.writeText(text).then(function () {
+        btn.classList.add("done");
+        var label = btn.lastChild;
+        label.textContent = " Copied";
+        setTimeout(function () {
+          btn.classList.remove("done");
+          label.textContent = " Copy";
+        }, 1600);
+      });
+    });
+  });
+</script>
+</body>
+</html>

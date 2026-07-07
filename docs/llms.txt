@@ -1,0 +1,41 @@
+# WhatTheDiff (wtd)
+
+> Open-source, deterministic semantic diff CLI. Point it at N files — configs,
+> JSON, YAML, Markdown, logs — and it reports what they agree on (consensus),
+> how far each file deviates (drift), which files are outliers, and the exact
+> evidence (file + line) behind every claim. Written in Zig; zero dependencies;
+> static ~300 KB binaries for Linux, macOS, and Windows.
+
+Key facts:
+- Answers "what actually matters?" across a whole corpus, not "what changed?" between two files.
+- Never compares raw text: files are decomposed into semantic primitives
+  (e.g. `$.db.port=5432`), each hashed with BLAKE3, so key order, whitespace,
+  quoting, and comments never register as differences.
+- Consensus buckets: universal (in all N files), majority (2k > N),
+  minority (1 < k, 2k ≤ N), unique (k = 1). The consensus core is every
+  primitive held by a strict majority.
+- Drift per file = 1 − Jaccard(its primitives, consensus core); outliers are
+  flagged past mean + 1.5σ.
+- Fully deterministic engine — no AI, no randomness; byte-identical reports.
+  Property-tested (seeded oracle suites) and benchmark-verified: ~23 µs/file,
+  flat scaling from 1,000 to 200,000 files; 4,000/4,000 planted outliers
+  detected with zero false positives.
+- `wtd --json` emits the full evidence graph (schema `wtd.report.v0`) for
+  pipelines and AI explanation layers.
+
+Install (checksum-verified):
+- Linux/macOS/Git Bash: `curl -fsSL https://raw.githubusercontent.com/copyleftdev/whatthediff/main/install.sh | sh`
+- Windows PowerShell: `irm https://raw.githubusercontent.com/copyleftdev/whatthediff/main/install.ps1 | iex`
+
+Usage:
+- `wtd <dir>` — human report (consensus, drift ranking, outlier evidence)
+- `wtd <dir> --drift` / `--consensus` — single sections
+- `wtd <dir> --json [--evidence]` — machine-readable evidence graph
+
+## Links
+
+- [Source repository](https://github.com/copyleftdev/whatthediff): Zig source, tests, benchmarks
+- [README](https://github.com/copyleftdev/whatthediff/blob/main/README.md): full documentation
+- [Design philosophy](https://github.com/copyleftdev/whatthediff/blob/main/intent.md): deterministic pipeline, evidence model, AI responsibilities
+- [Releases](https://github.com/copyleftdev/whatthediff/releases): static binaries + SHA256SUMS for six platforms
+- [Benchmark harness](https://github.com/copyleftdev/whatthediff/blob/main/scripts/bench.sh): reproduce the published numbers
