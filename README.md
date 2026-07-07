@@ -84,9 +84,24 @@ flagged at mean + 1.5σ (N ≥ 4).
 
 ## 🚀 Quick start
 
-Grab a prebuilt binary from [Releases](../../releases) — static, zero-install,
-for Linux (x86_64/aarch64, fully static musl), macOS (Intel/Apple Silicon),
-and Windows (x86_64/aarch64). Or build from source:
+**One-liner** (Linux, macOS, Git Bash — detects your OS/arch, verifies the
+SHA256, installs to `/usr/local/bin` or `~/.local/bin`):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/copyleftdev/whatthediff/main/install.sh | sh
+```
+
+**Windows PowerShell:**
+
+```powershell
+irm https://raw.githubusercontent.com/copyleftdev/whatthediff/main/install.ps1 | iex
+```
+
+Pin a version with `WTD_VERSION=v0.1.0`, choose a directory with
+`WTD_INSTALL_DIR`. Or grab a binary yourself from
+[Releases](../../releases) — static, zero-install, for Linux
+(x86_64/aarch64, fully static musl), macOS (Intel/Apple Silicon), and
+Windows (x86_64/aarch64). Or build from source:
 
 ```sh
 zig build -Doptimize=ReleaseFast    # → zig-out/bin/wtd  (Zig 0.14, zero deps)
