@@ -1,0 +1,23 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: 0.14.0
+      - name: Format check
+        run: zig fmt --check src tools build.zig
+      - name: Unit + property tests
+        run: zig build test --summary all
+      - name: Cross-compile all release targets
+        run: zig build release
+      - name: Scale benchmark (correctness-asserting)
+        run: SIZES="100 1000" scripts/bench.sh
