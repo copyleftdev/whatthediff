@@ -92,7 +92,7 @@ pub fn runOpts(arena: std.mem.Allocator, paths: []const []const u8, opts: RunOpt
         if (kind == .text and isBinary(content)) kind = .binary;
         // A file *declared* as a text format but actually binary is
         // malformed input — skip it rather than chunk it.
-        if (kind != .pdf and kind != .binary and isBinary(content)) {
+        if (kind != .pdf and kind != .binary and kind != .cbor and isBinary(content)) {
             skipped += 1;
             continue;
         }

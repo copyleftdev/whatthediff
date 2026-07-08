@@ -14,6 +14,7 @@ pub const ArtifactKind = enum {
     yaml,
     xml,
     pdf,
+    cbor,
     binary,
     markdown,
     config,

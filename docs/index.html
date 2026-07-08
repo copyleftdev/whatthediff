@@ -95,7 +95,7 @@
         {
           "@type": "Question",
           "name": "What file formats does WhatTheDiff understand?",
-          "acceptedAnswer": { "@type": "Answer", "text": "JSON (fully parsed, including JSONC — comments and trailing commas, so tsconfig.json and VS Code settings.json work), YAML-style configs, XML (including attributes, entities and CDATA), PDF (text extraction, including FlateDecode-compressed streams), and binaries/executables (SSDeep-class fuzzy analysis via content-defined chunking — clusters executables into families by shared code, with ELF/PE/Mach-O/Wasm format detection). Plus INI/env/TOML-style key-value files, Markdown, and any text file as a fallback. Formats unify: the same fact in JSON, YAML, INI, or XML hashes to the same identity, so mixed-format corpora find real consensus. Malformed input degrades gracefully to line-based comparison instead of failing." }
+          "acceptedAnswer": { "@type": "Answer", "text": "JSON (fully parsed, including JSONC — comments and trailing commas, so tsconfig.json and VS Code settings.json work), YAML-style configs, XML (including attributes, entities and CDATA), CBOR (RFC 8949 binary — unifies with its JSON twin), PDF (text extraction, including FlateDecode-compressed streams), and binaries/executables (SSDeep-class fuzzy analysis via content-defined chunking — clusters executables into families by shared code, with ELF/PE/Mach-O/Wasm format detection). Plus INI/env/TOML-style key-value files, Markdown, and any text file as a fallback. Formats unify: the same fact in JSON, YAML, INI, or XML hashes to the same identity, so mixed-format corpora find real consensus. Malformed input degrades gracefully to line-based comparison instead of failing." }
         }
       ]
     }
@@ -429,7 +429,7 @@
   <div class="hero">
     <div class="wrap">
       <div>
-        <span class="eyebrow rise">Deterministic semantic diff · v1.1.0</span>
+        <span class="eyebrow rise">Deterministic semantic diff · v1.2.0</span>
         <h1 class="rise">The diff that answers<br>“what actually matters?”</h1>
         <p class="lede rise">Point <strong>wtd</strong> at a directory of configs, contracts, or JSON.
         It finds the <strong>consensus</strong>, ranks the <strong>drift</strong>, flags the
@@ -752,6 +752,7 @@ copyleftdev/whatthediff/main/install.ps1 | iex</pre>
           <summary>What formats does it understand?</summary>
           <p>JSON (fully parsed, incl. JSONC — comments/trailing commas, so tsconfig.json works),
           YAML-style configs, XML (attributes, entities, CDATA),
+          CBOR (RFC 8949 binary — the same fact in CBOR and JSON is one identity),
           PDF (text extraction, FlateDecode included), binaries/executables (SSDeep-class
           fuzzy analysis — clusters executables into families by shared content-defined
           chunks, ELF/PE/Mach-O/Wasm detection), INI/env/TOML-style key-value files,

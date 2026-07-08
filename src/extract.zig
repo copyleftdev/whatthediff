@@ -9,6 +9,7 @@ const yamlish = @import("extractors/yamlish.zig");
 const xml = @import("extractors/xml.zig");
 const pdf = @import("extractors/pdf.zig");
 const binary = @import("extractors/binary.zig");
+const cbor = @import("extractors/cbor.zig");
 const config = @import("extractors/config.zig");
 const markdown = @import("extractors/markdown.zig");
 const text = @import("extractors/text.zig");
@@ -34,6 +35,11 @@ pub fn extract(
             error.Unparseable => try arena.alloc(types.Primitive, 0),
             else => |e| e,
         },
+        .cbor => cbor.extract(arena, content) catch |err| switch (err) {
+            // Undecodable .cbor is still a binary blob — fuzzy-chunk it.
+            error.Unparseable => binary.extract(arena, content),
+            else => |e| e,
+        },
         .binary => binary.extract(arena, content),
         .config => config.extract(arena, content),
         .markdown => markdown.extract(arena, content),
@@ -47,6 +53,11 @@ pub fn extract(
             }
             if (lead.len > 0 and lead[0] == '<') {
                 if (xml.extract(arena, content)) |prims| {
+                    break :blk prims;
+                } else |_| {}
+            }
+            if (std.mem.startsWith(u8, content, &cbor.self_describe)) {
+                if (cbor.extract(arena, content)) |prims| {
                     break :blk prims;
                 } else |_| {}
             }

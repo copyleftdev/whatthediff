@@ -631,6 +631,96 @@ test "tri-format corpus: JSON, YAML, and INI of the same config fully agree" {
     }
 }
 
+// -------------------------------------------- cbor cross-format -----------
+
+const cbor_extractor = @import("extractors/cbor.zig");
+
+/// Encode a CfNode (maps of scalars/lists) as CBOR — the binary twin of the
+/// JSON the `writeCfJson` helper produces, so both must decode to identical
+/// identities. Scalars are typed to match `writeCfJsonScalar`: true/false/null
+/// and integers stay typed; everything else is a text string.
+fn cborUint(major: u3, n: u64, out: *std.ArrayList(u8)) !void {
+    const m: u8 = @as(u8, major) << 5;
+    if (n < 24) {
+        try out.append(m | @as(u8, @intCast(n)));
+    } else if (n < 256) {
+        try out.append(m | 24);
+        try out.append(@intCast(n));
+    } else if (n < 65536) {
+        try out.append(m | 25);
+        var b: [2]u8 = undefined;
+        std.mem.writeInt(u16, &b, @intCast(n), .big);
+        try out.appendSlice(&b);
+    } else {
+        try out.append(m | 26);
+        var b: [4]u8 = undefined;
+        std.mem.writeInt(u32, &b, @intCast(n), .big);
+        try out.appendSlice(&b);
+    }
+}
+
+fn cborText(s: []const u8, out: *std.ArrayList(u8)) !void {
+    try cborUint(3, s.len, out);
+    try out.appendSlice(s);
+}
+
+fn cborScalar(s: []const u8, out: *std.ArrayList(u8)) !void {
+    if (std.mem.eql(u8, s, "true")) return out.append(0xf5);
+    if (std.mem.eql(u8, s, "false")) return out.append(0xf4);
+    if (std.mem.eql(u8, s, "null")) return out.append(0xf6);
+    if (std.fmt.parseInt(i64, s, 10)) |n| {
+        if (n >= 0) return cborUint(0, @intCast(n), out);
+        return cborUint(1, @intCast(-(n + 1)), out);
+    } else |_| {}
+    return cborText(s, out);
+}
+
+fn writeCfCbor(node: CfNode, out: *std.ArrayList(u8)) !void {
+    switch (node) {
+        .scalar => |s| try cborScalar(s, out),
+        .list => |items| {
+            try cborUint(4, items.len, out);
+            for (items) |item| try cborScalar(item, out);
+        },
+        .map => |fields| {
+            try cborUint(5, fields.len, out);
+            for (fields) |f| {
+                try cborText(f.name, out);
+                try writeCfCbor(f.value, out);
+            }
+        },
+    }
+}
+
+test "property: the same structure in JSON and CBOR yields identical identities" {
+    var iter: u64 = 0;
+    while (iter < 150) : (iter += 1) {
+        const seed = 0x5eed_000b + iter;
+        errdefer std.debug.print("\ncounterexample: cbor cross-format property, seed=0x{x}\n", .{seed});
+
+        var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena_state.deinit();
+        const arena = arena_state.allocator();
+        var prng = std.Random.DefaultPrng.init(seed);
+        const rand = prng.random();
+
+        const doc = try genCfMap(arena, rand, 3);
+
+        var json_text = std.ArrayList(u8).init(arena);
+        try writeCfJson(doc, &json_text);
+        var cbor_bytes = std.ArrayList(u8).init(arena);
+        try writeCfCbor(doc, &cbor_bytes);
+
+        const from_json = try json_extractor.extract(arena, json_text.items);
+        const from_cbor = try cbor_extractor.extract(arena, cbor_bytes.items);
+
+        const cj = try sortedCanonicals(arena, from_json);
+        const cc = try sortedCanonicals(arena, from_cbor);
+        try std.testing.expectEqual(cj.len, cc.len);
+        for (cj, cc) |a, b| try std.testing.expectEqualStrings(a, b);
+    }
+}
+
 // -------------------------------------------- xml cross-format ------------
 
 const xml_extractor = @import("extractors/xml.zig");

@@ -4,9 +4,9 @@
 
 **Traditional diff tools answer *"what changed?"* — WTD answers *"what actually matters?"***
 
-[![Version](https://img.shields.io/badge/version-1.1.0-0090ff)](https://github.com/copyleftdev/whatthediff/releases/latest)
+[![Version](https://img.shields.io/badge/version-1.2.0-0090ff)](https://github.com/copyleftdev/whatthediff/releases/latest)
 [![Zig](https://img.shields.io/badge/Zig-0.14-f7a41d?logo=zig&logoColor=white)](https://ziglang.org)
-[![Tests](https://img.shields.io/badge/tests-70%2F70-brightgreen)](#-testing)
+[![Tests](https://img.shields.io/badge/tests-76%2F76-brightgreen)](#-testing)
 [![Property iterations](https://img.shields.io/badge/property_iterations-1065-brightgreen)](#-testing)
 [![Scale](https://img.shields.io/badge/1M_files-22µs%2Ffile-blue)](#-scale)
 [![Deterministic](https://img.shields.io/badge/reports-byte--identical-8A2BE2)](#-testing)
@@ -67,15 +67,16 @@ Artifacts are never compared as raw text. Each is decomposed into
 
 | kind        | source                                | canonical form                 |
 |-------------|---------------------------------------|--------------------------------|
-| `kv`        | JSON, YAML-lite, XML-lite, config     | `db.port=5432`, `features[]=x` |
+| `kv`        | JSON/JSONC, YAML-lite, XML-lite, CBOR, config | `db.port=5432`, `features[]=x` |
 | `heading`   | Markdown                         | `h2:Deployment`                |
 | `line`      | PDF text, text fallback          | normalized text line           |
 | `chunk`     | binaries / executables (SSDeep-style) | content-defined chunk hash |
 
 Each primitive's identity is `BLAKE3(kind ‖ 0x00 ‖ canonical)`.
 **The canonical form is cross-format**: `{"db":{"port":5432}}` in JSON,
-`db:\n  port: 5432` in YAML, `[db]\nport = 5432` in INI, and
-`<db port="5432"/>` in XML all hash to the same identity — a mixed-format
+`db:\n  port: 5432` in YAML, `[db]\nport = 5432` in INI,
+`<db port="5432"/>` in XML, and the **CBOR bytes** `A2 62 64 62 …` all hash to
+the same identity — a mixed-format
 corpus finds real consensus instead of splitting into format factions. XML
 attributes unify with child elements (attribute-vs-element is syntax, not
 meaning). Lists are index-less (`features[]=x`), so reordering a list is
