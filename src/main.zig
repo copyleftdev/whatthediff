@@ -29,4 +29,6 @@ test {
     _ = @import("render.zig");
     _ = @import("cli.zig");
     _ = @import("proptest.zig");
+    _ = @import("ai.zig");
+    _ = @import("ask.zig");
 }

@@ -117,6 +117,32 @@ scripts/release.sh                  # test + package dist/*.tar.gz|zip + SHA256S
 | `wtd configs/ --consensus` | consensus buckets only |
 | `wtd configs/ --json` | machine-readable evidence graph (`wtd.report.v0`) |
 | `wtd configs/ --json --evidence` | uncapped occurrence lists |
+| `wtd ask "<question>" configs/` | AI explains the evidence (see below) |
+
+## 🤖 wtd ask
+
+```console
+$ wtd ask "why is svc-d.yaml different from the others?" configs/
+```
+
+The deterministic engine runs first and selects the evidence relevant to your
+question — the focus file's unique primitives (with line numbers), the
+consensus-core primitives it's *missing*, and the corpus drift table. That
+evidence block is the **only** thing the model sees, under a system prompt
+that forbids stating anything not present in it and requires `(path:line)`
+citations. The engine proves; the AI narrates. It can never invent a finding.
+
+Works with three kinds of providers (checked in this order):
+
+| provider | configure |
+|---|---|
+| Any custom/local endpoint (Ollama, llama.cpp, vLLM) | `WTD_AI_URL=http://localhost:11434/v1/chat/completions WTD_AI_MODEL=<model>` — no key needed |
+| Anthropic Messages API | `ANTHROPIC_API_KEY=...` (default model `claude-opus-4-8`) |
+| OpenRouter / OpenAI-compatible | `OPENROUTER_API_KEY=...` (honors `OPENROUTER_BASE_URL`, `OPENROUTER_MODEL`) |
+
+`--model <m>` overrides the model; `--dry-run` prints the exact prompt
+(system + evidence) without calling anything — useful for auditing what the
+model is allowed to know, and it needs no key.
 
 ## 🧪 Testing
 
@@ -187,8 +213,8 @@ Each module is independently testable and replaceable; extractors degrade
 
 ## 🗺 Roadmap
 
-- [ ] `wtd ask "why is contract_17 different?"` — AI adapter explaining the
-  evidence graph (the `--json` report is already its input contract)
+- [x] `wtd ask "why is contract_17 different?"` — AI adapter explaining the
+  evidence graph (v0.2.0: Anthropic / OpenAI-compatible / local endpoints)
 - [ ] Cross-format canonical unification (same fact in JSON and YAML → same identity)
 - [ ] Pairwise similarity / clustering — find factions, not just outliers
 - [ ] PDF, XML, and source-code extractors

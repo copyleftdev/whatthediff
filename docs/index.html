@@ -74,7 +74,7 @@
         {
           "@type": "Question",
           "name": "Does WhatTheDiff use AI?",
-          "acceptedAnswer": { "@type": "Answer", "text": "The comparison engine is fully deterministic — no AI, no embeddings, no randomness. Same corpus in, byte-identical report out. An AI adapter is on the roadmap for explaining the evidence graph, but the engine remains the only source of truth." }
+          "acceptedAnswer": { "@type": "Answer", "text": "The comparison engine is fully deterministic — no AI, no embeddings, no randomness. Same corpus in, byte-identical report out. The optional 'wtd ask' command sends the engine's evidence to an LLM (Anthropic API, OpenRouter, or a local model via Ollama) that explains it with file-and-line citations — it can never invent a finding, because the evidence block is all it sees." }
         },
         {
           "@type": "Question",
@@ -624,8 +624,11 @@ copyleftdev/whatthediff/main/install.ps1 | iex</pre>
         <details>
           <summary>Does it use AI?</summary>
           <p>Not in the engine. Comparison, consensus, drift and outlier detection are fully
-          deterministic — byte-identical output for the same corpus. An AI adapter is on the
-          roadmap for <em>explaining</em> the evidence graph, but it can never invent a finding.</p>
+          deterministic — byte-identical output for the same corpus. The optional
+          <span style="font-family:var(--mono);font-size:.9em">wtd ask</span> command sends the
+          engine's evidence to an LLM (Anthropic API, OpenRouter, or a local model via Ollama)
+          that <em>explains</em> it with file-and-line citations — it can never invent a finding,
+          because the evidence block is all it sees.</p>
         </details>
         <details>
           <summary>What formats does it understand?</summary>
@@ -649,10 +652,11 @@ copyleftdev/whatthediff/main/install.ps1 | iex</pre>
         </details>
         <details>
           <summary>What's on the roadmap?</summary>
-          <p><span style="font-family:var(--mono);font-size:.9em">wtd ask</span> (an AI adapter over the evidence graph),
-          cross-format canonical unification (same fact in JSON and YAML → same identity),
+          <p>Cross-format canonical unification (same fact in JSON and YAML → same identity),
           pairwise clustering to find factions, PDF/XML extractors, and a streaming evidence
-          store for millions of artifacts.</p>
+          store for millions of artifacts.
+          (<span style="font-family:var(--mono);font-size:.9em">wtd ask</span> — the AI adapter
+          over the evidence graph — shipped in v0.2.0.)</p>
         </details>
       </div>
     </div>

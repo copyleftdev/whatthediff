@@ -31,6 +31,12 @@ Usage:
 - `wtd <dir>` — human report (consensus, drift ranking, outlier evidence)
 - `wtd <dir> --drift` / `--consensus` — single sections
 - `wtd <dir> --json [--evidence]` — machine-readable evidence graph
+- `wtd ask "why is X different?" <dir>` — an LLM explains the deterministic
+  evidence with file:line citations; works with the Anthropic API
+  (ANTHROPIC_API_KEY), OpenRouter (OPENROUTER_API_KEY), or any local
+  OpenAI-compatible endpoint like Ollama (WTD_AI_URL + WTD_AI_MODEL, no key).
+  The model only ever sees engine-generated evidence — it cannot invent findings.
+  `--dry-run` prints the exact prompt without calling a model.
 
 ## Links
 
