@@ -37,7 +37,7 @@
       "alternateName": "wtd",
       "applicationCategory": "DeveloperApplication",
       "operatingSystem": "Linux, macOS, Windows",
-      "softwareVersion": "0.5.0",
+      "softwareVersion": "0.8.0",
       "description": "Deterministic semantic diff for N artifacts: compares many configs, JSON, YAML or text files at once, finds consensus, ranks drift, flags outliers, and backs every claim with inspectable evidence. The deterministic engine is the source of truth; an AI only explains what the engine proved.",
       "url": "https://copyleftdev.github.io/whatthediff/",
       "downloadUrl": "https://github.com/copyleftdev/whatthediff/releases/latest",
@@ -81,6 +81,11 @@
           "@type": "Question",
           "name": "How do I install WhatTheDiff?",
           "acceptedAnswer": { "@type": "Answer", "text": "One line on Linux, macOS or Git Bash: curl -fsSL https://raw.githubusercontent.com/copyleftdev/whatthediff/main/install.sh | sh — or on Windows PowerShell: irm https://raw.githubusercontent.com/copyleftdev/whatthediff/main/install.ps1 | iex. Both verify the SHA256 checksum before installing. Static binaries for six platforms are also on the GitHub Releases page." }
+        },
+        {
+          "@type": "Question",
+          "name": "Can WhatTheDiff compare binaries or executables?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. Executables are analyzed with content-defined chunking — the content-triggered piecewise hashing technique at the core of SSDeep/CTPH fuzzy hashing. Each content-defined chunk becomes a primitive, so the same consensus, drift and faction engine clusters binaries by shared code, revealing which executables are variants of the same program. Unlike SSDeep's pairwise similarity score, you get family clustering, the shared and unique regions as evidence with byte offsets, and an AI explanation. ELF, PE, Mach-O and Wasm formats and their architectures are detected." }
         },
         {
           "@type": "Question",
@@ -315,6 +320,30 @@
   td .pass { color:var(--grass-11); }
   .bench-note { margin-top:var(--space-md); font-size:0.875rem; color:var(--slate-10); max-width:70ch; }
 
+  /* binary similarity */
+  #binary { border-top:var(--border); }
+  .binary-grid {
+    margin-top:var(--space-2xl); display:grid;
+    grid-template-columns:minmax(0,1fr) minmax(0,300px); gap:var(--space-3xl); align-items:center;
+  }
+  @media (max-width:840px){ .binary-grid { grid-template-columns:1fr; gap:var(--space-xl); } }
+  .binary-art { text-align:center; }
+  .binary-art img { width:100%; max-width:300px; height:auto; }
+  .binary-art figcaption { margin-top:var(--space-sm); font-size:0.8125rem; color:var(--slate-9); }
+  @media (max-width:840px){ .binary-art { order:-1; } .binary-art img { max-width:220px; } }
+  .fam-term {
+    margin-top:var(--space-lg); background:var(--slate-2); border:var(--border);
+    border-radius:var(--radius-md); overflow:hidden;
+  }
+  .fam-term pre {
+    padding:var(--space-md) var(--space-lg); font-family:var(--mono);
+    font-size:0.72rem; line-height:1.75; overflow-x:auto; color:var(--slate-11);
+  }
+  .fam-term .hd { color:var(--slate-12); }
+  .fam-term .fa { color:var(--grass-11); }
+  .fam-term .fb { color:var(--iris-11); }
+  .fam-term .dim { color:var(--slate-9); }
+
   /* install */
   #install { background:var(--slate-2); border-block:var(--border); }
   .oses { margin-top:var(--space-2xl); display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:var(--space-lg); }
@@ -374,6 +403,7 @@
     <nav class="main" aria-label="Main">
       <a class="hide-sm" href="#how">How it works</a>
       <a class="hide-sm" href="#bench">Benchmarks</a>
+      <a class="hide-sm" href="#binary">Binaries</a>
       <a class="hide-sm" href="#faq">FAQ</a>
       <a href="#install">Install</a>
       <a class="gh" href="https://github.com/copyleftdev/whatthediff" aria-label="WhatTheDiff on GitHub">
@@ -588,6 +618,44 @@ Corpus: 5 artifacts · 12 distinct primitives · 34 observations
     </div>
   </section>
 
+  <section id="binary">
+    <div class="wrap">
+      <span class="kicker">Beyond text</span>
+      <h2>It reads binaries too — like SSDeep, but it explains itself.</h2>
+      <p class="sub">Point wtd at a folder of executables and every binary is cut into
+      <em>content-defined chunks</em> — the same content-triggered piecewise hashing at the
+      heart of SSDeep/CTPH. Each chunk is a primitive, so the same consensus, drift and
+      <strong>faction</strong> engine clusters executables by shared code — with the exact
+      chunks and byte offsets as evidence.</p>
+
+      <div class="binary-grid">
+        <div>
+          <div class="fam-term" aria-label="wtd faction output on six ELF binaries">
+            <pre><span class="dim">$</span> <span class="hd">wtd ./samples --factions</span>
+
+<span class="hd">Factions</span> <span class="dim">(groups deviating from consensus in the same way)</span>
+  <span class="fa">faction of 3 · cohesion 1.00</span>
+    <span class="fa">members: mathapp-v1, mathapp-v2, mathapp-v3</span>
+    shared: chunk f722a9b73035213b… <span class="dim">(3/3 members)</span>
+  <span class="fb">faction of 3 · cohesion 1.00</span>
+    <span class="fb">members: textproc-v1, textproc-v2, textproc-v3</span>
+    shared: chunk 2123887eae9ddcfe… <span class="dim">(3/3 members)</span></pre>
+          </div>
+          <p class="sub" style="margin-top:var(--space-md)">Six stripped ELF binaries, source deleted —
+          two families of three variant builds each, clustered correctly from the bytes alone.
+          Unlike SSDeep's pairwise 0–100 score you get family clustering, shared-vs-unique regions,
+          and <code style="font-family:var(--mono);font-size:.85em">wtd ask "which are variants of
+          the same program?"</code>. ELF, PE, Mach-O and Wasm are recognized, so a lone PE among ELF
+          files is an outlier before chunk analysis even matters.</p>
+        </div>
+        <figure class="binary-art">
+          <img src="peek-re.png" alt="Peek in RE mode — the mascot suited up with a scanner cannon and targeting reticle for hunting through binaries">
+          <figcaption>Peek, in RE mode.</figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
   <section id="install">
     <div class="wrap">
       <span class="kicker">Install</span>
@@ -662,6 +730,14 @@ copyleftdev/whatthediff/main/install.ps1 | iex</pre>
           A file's drift is 1 − Jaccard(its primitives, core); anything past mean + 1.5σ is
           flagged. In benchmarks with planted rogues, detection is exact at every corpus size
           — 4,000 of 4,000 found at 200k files, zero false positives.</p>
+        </details>
+        <details>
+          <summary>Can it compare binaries or executables?</summary>
+          <p>Yes — see <a href="#binary">Beyond text</a> above. Executables are cut into
+          <em>content-defined chunks</em> (the technique inside SSDeep/CTPH fuzzy hashing), so the
+          same faction engine clusters them into families of variants. Unlike SSDeep's pairwise
+          score you get clustering, the shared and unique regions with byte offsets, and an AI
+          explanation. ELF, PE, Mach-O and Wasm formats and architectures are detected.</p>
         </details>
         <details>
           <summary>Can I trust the binaries?</summary>
