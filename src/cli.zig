@@ -6,7 +6,7 @@ const engine = @import("engine.zig");
 const render = @import("render.zig");
 const ask = @import("ask.zig");
 
-pub const version = "1.0.0";
+pub const version = "1.0.1";
 
 const usage =
     \\wtd — WhatTheDiff: what actually matters across N artifacts
@@ -21,6 +21,9 @@ const usage =
     \\  --consensus   Only the consensus section
     \\  --drift       Only the drift section
     \\  --factions    Only the factions section (groups deviating together)
+    \\  --keys-only   Compare structure, not values (drops values from key=value
+    \\                primitives, hashes raw lines). Secret-safe: point it at
+    \\                credential/.env profiles to find schema drift safely.
     \\  --version     Print version
     \\  --help        Print this help
     \\

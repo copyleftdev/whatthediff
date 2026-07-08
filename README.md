@@ -4,7 +4,7 @@
 
 **Traditional diff tools answer *"what changed?"* — WTD answers *"what actually matters?"***
 
-[![Version](https://img.shields.io/badge/version-1.0.0-0090ff)](https://github.com/copyleftdev/whatthediff/releases/latest)
+[![Version](https://img.shields.io/badge/version-1.0.1-0090ff)](https://github.com/copyleftdev/whatthediff/releases/latest)
 [![Zig](https://img.shields.io/badge/Zig-0.14-f7a41d?logo=zig&logoColor=white)](https://ziglang.org)
 [![Tests](https://img.shields.io/badge/tests-67%2F67-brightgreen)](#-testing)
 [![Property iterations](https://img.shields.io/badge/property_iterations-1065-brightgreen)](#-testing)
