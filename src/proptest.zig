@@ -395,6 +395,83 @@ fn ltU32(_: void, a: u32, b: u32) bool {
     return a < b;
 }
 
+const gate_mod = @import("gate.zig");
+
+fn gateObserved(metric: gate_mod.Metric, m: gate_mod.Metrics) f64 {
+    return switch (metric) {
+        .conflicts => @floatFromInt(m.conflicts),
+        .outliers => @floatFromInt(m.outliers),
+        .drift => m.max_drift,
+    };
+}
+
+test "property: gate verdict matches an independent threshold computation" {
+    var iter: u64 = 0;
+    while (iter < 200) : (iter += 1) {
+        const seed = 0x5eed_000d + iter;
+        errdefer std.debug.print("\ncounterexample: gate property, seed=0x{x}\n", .{seed});
+
+        var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena_state.deinit();
+        const arena = arena_state.allocator();
+        var prng = std.Random.DefaultPrng.init(seed);
+        const rand = prng.random();
+
+        const metrics = gate_mod.Metrics{
+            .conflicts = rand.uintLessThan(u64, 10),
+            .outliers = rand.uintLessThan(u64, 10),
+            .max_drift = rand.float(f64),
+        };
+
+        // Build a random, well-formed spec and remember each condition's metric.
+        const n_cond = rand.intRangeAtMost(usize, 1, 4);
+        var spec = std.ArrayList(u8).init(arena);
+        const want_metrics = try arena.alloc(gate_mod.Metric, n_cond);
+        for (want_metrics, 0..) |*wm, ci| {
+            if (ci > 0) try spec.append(',');
+            switch (rand.uintLessThan(u8, 3)) {
+                0 => {
+                    wm.* = .conflicts;
+                    if (rand.boolean())
+                        try spec.appendSlice("conflicts")
+                    else
+                        try spec.writer().print("conflicts>{d}", .{rand.uintLessThan(u64, 12)});
+                },
+                1 => {
+                    wm.* = .outliers;
+                    if (rand.boolean())
+                        try spec.appendSlice("outliers")
+                    else
+                        try spec.writer().print("outliers>{d}", .{rand.uintLessThan(u64, 12)});
+                },
+                else => {
+                    wm.* = .drift;
+                    try spec.writer().print("drift>{d:.2}", .{rand.float(f64)});
+                },
+            }
+        }
+
+        const conds = try gate_mod.parse(arena, spec.items);
+        // Parse preserves the number and identity of conditions.
+        try std.testing.expectEqual(n_cond, conds.len);
+        for (conds, want_metrics) |c, wm| try std.testing.expectEqual(wm, c.metric);
+
+        // Independent verdict over the parsed thresholds.
+        var expect_failed = false;
+        for (conds) |c| {
+            if (gateObserved(c.metric, metrics) > c.threshold) expect_failed = true;
+        }
+
+        const report = try gate_mod.evaluate(arena, metrics, conds);
+        try std.testing.expectEqual(expect_failed, report.failed);
+        for (report.conditions, conds) |r, c| {
+            const obs = gateObserved(c.metric, metrics);
+            try std.testing.expectEqual(obs, r.observed);
+            try std.testing.expectEqual(obs > c.threshold, r.tripped);
+        }
+    }
+}
+
 // ------------------------------------------- extractor equivalence --------
 
 const JsonNode = union(enum) {

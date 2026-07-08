@@ -4,10 +4,10 @@
 
 **Traditional diff tools answer *"what changed?"* — WTD answers *"what actually matters?"***
 
-[![Version](https://img.shields.io/badge/version-1.3.0-0090ff)](https://github.com/copyleftdev/whatthediff/releases/latest)
+[![Version](https://img.shields.io/badge/version-1.4.0-0090ff)](https://github.com/copyleftdev/whatthediff/releases/latest)
 [![Zig](https://img.shields.io/badge/Zig-0.14-f7a41d?logo=zig&logoColor=white)](https://ziglang.org)
-[![Tests](https://img.shields.io/badge/tests-83%2F83-brightgreen)](#-testing)
-[![Property iterations](https://img.shields.io/badge/property_iterations-1335-brightgreen)](#-testing)
+[![Tests](https://img.shields.io/badge/tests-89%2F89-brightgreen)](#-testing)
+[![Property iterations](https://img.shields.io/badge/property_iterations-1535-brightgreen)](#-testing)
 [![Scale](https://img.shields.io/badge/1M_files-22µs%2Ffile-blue)](#-scale)
 [![Deterministic](https://img.shields.io/badge/reports-byte--identical-8A2BE2)](#-testing)
 [![Dependencies](https://img.shields.io/badge/dependencies-0-lightgrey)](#-architecture)
@@ -115,7 +115,7 @@ curl -fsSL https://raw.githubusercontent.com/copyleftdev/whatthediff/main/instal
 irm https://raw.githubusercontent.com/copyleftdev/whatthediff/main/install.ps1 | iex
 ```
 
-Pin a version with `WTD_VERSION=v1.3.0`, choose a directory with
+Pin a version with `WTD_VERSION=v1.4.0`, choose a directory with
 `WTD_INSTALL_DIR`. Or grab a binary yourself from
 [Releases](../../releases) — static, zero-install, for Linux
 (x86_64/aarch64, fully static musl), macOS (Intel/Apple Silicon), and
@@ -134,6 +134,7 @@ scripts/release.sh                  # test + package dist/*.tar.gz|zip + SHA256S
 | `wtd configs/ --drift` | drift ranking only |
 | `wtd configs/ --consensus` | consensus buckets only |
 | `wtd configs/ --conflicts` | keys the fleet disagrees on: majority value + the deviant files |
+| `wtd configs/ --fail-on conflicts` | CI gate: exit 3 if the fleet disagrees |
 | `wtd configs/ --factions` | groups deviating from consensus together |
 | `wtd creds/ --keys-only` | compare structure not values — secret-safe schema drift |
 | `wtd configs/ --json` | machine-readable evidence graph (`wtd.report.v1`) |
@@ -178,6 +179,45 @@ identifier fields (hostnames, node ids) where every file legitimately differs.
 Under `--keys-only` values are gone entirely, so conflicts reports nothing —
 secret-safe by construction. Machine-readable via `--json` (`conflicts[]`, each
 with `key`, `holders`, `deviants`, and per-value witness sets).
+
+## 🚦 CI gate — `--fail-on`
+
+Turn any of that into an enforcement rule. `--fail-on` evaluates a policy and
+**exits `3`** when the corpus violates it, so a pipeline blocks the change:
+
+```console
+$ wtd configs/ --fail-on conflicts
+...
+Gate (--fail-on)
+  ✗ conflicts  1 (threshold > 0)  FAIL
+  GATE FAILED
+$ echo $?
+3
+```
+
+The spec is a comma-separated list of conditions — a bare count means "> 0":
+
+| condition | fails when |
+|---|---|
+| `conflicts` / `conflicts>N` | any conflicting key / more than N |
+| `outliers` / `outliers>N` | any drift outlier / more than N |
+| `drift>F` | any artifact's drift exceeds `F` (0–1) |
+
+e.g. `--fail-on 'conflicts,drift>0.5'`. **Exit codes:** `0` ok · `1` error ·
+`2` usage · `3` gate failed. The verdict is in `--json` too (a `gate` object,
+`null` when the flag is absent), so machine consumers read `.gate.failed`.
+
+Drop it into GitHub Actions to block config drift on every PR:
+
+```yaml
+- name: Guard config fleet
+  run: |
+    curl -fsSL https://raw.githubusercontent.com/copyleftdev/whatthediff/main/install.sh | sh
+    wtd ./configs --fail-on 'conflicts,outliers'
+```
+
+Point it at credential profiles with `--keys-only --fail-on conflicts` and the
+gate stays secret-safe — no value is ever compared or printed.
 
 ## 🤖 wtd ask
 
@@ -349,10 +389,12 @@ original spec (SSDeep-class binary analysis, secret-safe schema comparison).
 - [x] Conflicts — the odd-one-out report (v1.3.0: `--conflicts` reports the
   fleet's agreed value per scalar key and names the deviant files; cross-format,
   secret-safe under `--keys-only`; property-tested planted-conflict recovery)
+- [x] CI gate (v1.4.0: `--fail-on conflicts|outliers|drift>F` exits 3 on policy
+  violation — turns wtd into a pipeline guard; verdict in text + JSON;
+  property-tested against an independent threshold oracle)
 
 *Still ideas:* semantic source-code extractors, pairwise similarity matrix
-export, a `wtd triage` recipe for malware sample sets, and a `--fail-on`
-CI gate built on the conflicts engine.
+export, and a `wtd triage` recipe for malware sample sets.
 
 ## 📜 Design notes
 

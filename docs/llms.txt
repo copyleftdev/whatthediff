@@ -30,6 +30,13 @@ Key facts:
   Cross-format (a JSON value reconciles against the same key in YAML). List keys
   are bags and never flagged; identifier fields where every file differs are
   excluded. Under `--keys-only` no values are compared, so it stays secret-safe.
+- CI gate (`wtd <dir> --fail-on <spec>`): exits 3 when the corpus violates a
+  policy, so a pipeline can block a bad change. `<spec>` is a comma-separated
+  list of conditions — `conflicts[>N]`, `outliers[>N]`, `drift>F` (a bare count
+  means "> 0"). Exit codes: 0 ok, 1 error, 2 usage, 3 gate failed (distinct so
+  CI can tell a policy violation from a crash). The verdict is also in `--json`
+  as a `gate` object (null when the flag is absent). Secret-safe with
+  `--keys-only`. Example: `wtd ./configs --fail-on 'conflicts,drift>0.5'`.
 - Fully deterministic engine — no AI, no randomness; byte-identical reports.
   Property-tested (seeded oracle suites) and benchmark-verified: ~20 µs/file,
   flat scaling from 1,000 to 1,000,000 files (1M files: 21.8 s, 3.8 GB RSS);
@@ -47,6 +54,8 @@ Usage:
 - `wtd <dir>` — human report (consensus, drift ranking, outlier evidence)
 - `wtd <dir> --drift` / `--consensus` / `--conflicts` — single sections
   (`--conflicts`: the agreed value per key and which files disagree)
+- `wtd <dir> --fail-on <spec>` — CI gate; exit 3 on policy violation
+  (`conflicts`, `outliers`, `drift>F`, comma-separated)
 - `wtd <dir> --json [--evidence]` — machine-readable evidence graph
 - `wtd <dir> --keys-only` — compare files by structure, not values (drops the
   value from key=value primitives, hashes raw lines). Secret-safe: point it at

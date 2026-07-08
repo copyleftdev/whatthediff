@@ -8,6 +8,7 @@ const hash = @import("hash.zig");
 const engine = @import("engine.zig");
 const analysis = @import("analysis.zig");
 const conflicts_mod = @import("conflicts.zig");
+const gate_mod = @import("gate.zig");
 
 pub const Section = enum { all, consensus, drift, factions, conflicts };
 
@@ -15,6 +16,9 @@ pub const Options = struct {
     section: Section = .all,
     /// Emit every occurrence in JSON instead of capping per identity.
     full_evidence: bool = false,
+    /// When set (via --fail-on), the evaluated CI gate: rendered as a Gate
+    /// section in text and a `gate` object in JSON.
+    gate: ?*const gate_mod.Report = null,
 };
 
 const occurrence_cap = 16;
@@ -51,6 +55,28 @@ pub fn renderText(writer: anytype, corpus: *const engine.Corpus, opts: Options) 
     if (opts.section == .all or opts.section == .drift) {
         try renderUniqueEvidence(writer, corpus);
     }
+    if (opts.gate) |g| try renderGate(writer, g);
+}
+
+/// The CI gate verdict: one row per condition (observed vs threshold) and a
+/// final PASS/FAIL line. Always shown when --fail-on is set, whatever the
+/// section filter, so the failure reason is visible even if its section isn't.
+fn renderGate(writer: anytype, g: *const gate_mod.Report) !void {
+    try writer.print("\nGate (--fail-on)\n", .{});
+    for (g.conditions) |r| {
+        const mark: []const u8 = if (r.tripped) "\u{2717}" else "\u{2713}";
+        const verdict: []const u8 = if (r.tripped) "FAIL" else "ok";
+        if (r.condition.metric == .drift) {
+            try writer.print("  {s} {s:<10} {d:.3} (threshold > {d:.3})  {s}\n", .{
+                mark, gate_mod.metricName(r.condition.metric), r.observed, r.condition.threshold, verdict,
+            });
+        } else {
+            try writer.print("  {s} {s:<10} {d:.0} (threshold > {d:.0})  {s}\n", .{
+                mark, gate_mod.metricName(r.condition.metric), r.observed, r.condition.threshold, verdict,
+            });
+        }
+    }
+    try writer.print("  {s}\n", .{if (g.failed) "GATE FAILED" else "gate passed"});
 }
 
 /// The odd-one-out report: scalar keys the fleet disagrees on, plurality
@@ -305,6 +331,18 @@ const JsonConflict = struct {
     values: []JsonValueGroup,
 };
 
+const JsonGateCondition = struct {
+    metric: []const u8,
+    threshold: f64,
+    observed: f64,
+    tripped: bool,
+};
+
+const JsonGate = struct {
+    failed: bool,
+    conditions: []JsonGateCondition,
+};
+
 const JsonReport = struct {
     schema: []const u8,
     corpus: struct {
@@ -321,6 +359,8 @@ const JsonReport = struct {
         core_size: usize,
     },
     drift: struct { mean: f64, stddev: f64 },
+    /// Null unless --fail-on was given; present so CI can read the verdict.
+    gate: ?JsonGate,
     conflicts: []JsonConflict,
     factions: []JsonFaction,
     artifacts: []JsonArtifact,
@@ -370,6 +410,20 @@ pub fn renderJson(
         };
     }
 
+    var gate_out: ?JsonGate = null;
+    if (opts.gate) |g| {
+        const conds = try arena.alloc(JsonGateCondition, g.conditions.len);
+        for (g.conditions, 0..) |r, i| {
+            conds[i] = .{
+                .metric = gate_mod.metricName(r.condition.metric),
+                .threshold = r.condition.threshold,
+                .observed = r.observed,
+                .tripped = r.tripped,
+            };
+        }
+        gate_out = .{ .failed = g.failed, .conditions = conds };
+    }
+
     const conflicts_out = try arena.alloc(JsonConflict, corpus.conflicts.items.len);
     for (corpus.conflicts.items, 0..) |c, i| {
         const groups = try arena.alloc(JsonValueGroup, c.values.len);
@@ -412,6 +466,7 @@ pub fn renderJson(
             .core_size = a.core_size,
         },
         .drift = .{ .mean = a.mean_drift, .stddev = a.std_drift },
+        .gate = gate_out,
         .conflicts = conflicts_out,
         .factions = factions_out,
         .artifacts = artifacts,
