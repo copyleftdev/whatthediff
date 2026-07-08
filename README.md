@@ -160,6 +160,8 @@ model is allowed to know, and it needs no key.
 
 ## 🔬 Binary & executable analysis
 
+<img src="docs/peek-re.png" align="right" width="220" alt="Peek in RE mode — the mascot suited up with a scanner cannon and targeting reticle for hunting through binaries">
+
 Point wtd at a directory of executables and it does **SSDeep-class fuzzy
 analysis** — but self-explaining. Each binary is cut into *content-defined
 chunks* (the same content-triggered piecewise hashing technique inside
