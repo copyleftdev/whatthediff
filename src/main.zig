@@ -23,6 +23,7 @@ test {
     _ = @import("extractors/xml.zig");
     _ = @import("extractors/pdf.zig");
     _ = @import("extractors/binary.zig");
+    _ = @import("extractors/exe.zig");
     _ = @import("extractors/cbor.zig");
     _ = @import("extractors/config.zig");
     _ = @import("extractors/markdown.zig");

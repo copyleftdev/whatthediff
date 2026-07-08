@@ -472,6 +472,54 @@ test "property: gate verdict matches an independent threshold computation" {
     }
 }
 
+// ------------------------------------------- exe feature extraction -------
+
+const exe_extractor = @import("extractors/exe.zig");
+
+test "property: every embedded string is recovered from a blob" {
+    var iter: u64 = 0;
+    while (iter < 150) : (iter += 1) {
+        const seed = 0x5eed_000e + iter;
+        errdefer std.debug.print("\ncounterexample: string-recovery property, seed=0x{x}\n", .{seed});
+
+        var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena_state.deinit();
+        const arena = arena_state.allocator();
+        var prng = std.Random.DefaultPrng.init(seed);
+        const rand = prng.random();
+
+        // Blob = printable strings separated by 0x0A (non-printable to the
+        // scanner, and not 0x00, so no ASCII run merges and no UTF-16 forms).
+        const alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_./";
+        const n_str = rand.intRangeAtMost(usize, 1, 20);
+        var planted = std.ArrayList([]const u8).init(arena);
+        var blob = std.ArrayList(u8).init(arena);
+        for (0..n_str) |_| {
+            try blob.append(0x0a);
+            const len = rand.intRangeAtMost(usize, 5, 40);
+            const s = try arena.alloc(u8, len);
+            for (s) |*ch| ch.* = alphabet[rand.uintLessThan(usize, alphabet.len)];
+            try planted.append(s);
+            try blob.appendSlice(s);
+            try blob.append(0x0a);
+        }
+
+        var out = std.ArrayList(types.Primitive).init(arena);
+        try exe_extractor.features(arena, blob.items, &out);
+
+        var recovered = std.StringHashMap(void).init(arena);
+        const prefix = "strings[]=";
+        for (out.items) |p| {
+            if (std.mem.startsWith(u8, p.canonical, prefix)) {
+                try recovered.put(p.canonical[prefix.len..], {});
+            }
+        }
+        for (planted.items) |s| {
+            try std.testing.expect(recovered.contains(s));
+        }
+    }
+}
+
 // ------------------------------------------- extractor equivalence --------
 
 const JsonNode = union(enum) {

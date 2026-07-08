@@ -20,6 +20,7 @@
 
 const std = @import("std");
 const types = @import("../types.zig");
+const exe = @import("exe.zig");
 
 /// Chunking parameters. Average chunk ≈ min + 2^mask_bits. Smaller chunks
 /// give finer similarity resolution at the cost of more primitives; these
@@ -56,6 +57,11 @@ pub fn extract(arena: std.mem.Allocator, content: []const u8) ![]types.Primitive
         .canonical = try std.mem.concat(arena, u8, &.{ "binary.format=", detectFormat(content) }),
         .line = 0,
     });
+
+    // Structured RE features (imports/exports/sections/needs/strings) — the
+    // facts an analyst triages on, so consensus/drift/factions cluster by
+    // meaning, not just fuzzy bytes. Coexists with the chunk primitives below.
+    try exe.features(arena, content, &out);
 
     // Content-defined chunk boundaries.
     var start: usize = 0;
@@ -237,7 +243,8 @@ test "tiny input yields one chunk plus the format primitive" {
     defer arena_state.deinit();
     const arena = arena_state.allocator();
 
-    const p = try extract(arena, "short");
+    // Non-printable bytes: no strings extracted, so just format + one chunk.
+    const p = try extract(arena, "\x01\x02\x03\x04\x05");
     try std.testing.expectEqual(@as(usize, 2), p.len);
     try std.testing.expectEqualStrings("binary.format=binary", p[0].canonical);
     try std.testing.expectEqual(types.PrimitiveKind.chunk, p[1].kind);

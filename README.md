@@ -4,10 +4,10 @@
 
 **Traditional diff tools answer *"what changed?"* — WTD answers *"what actually matters?"***
 
-[![Version](https://img.shields.io/badge/version-1.4.0-0090ff)](https://github.com/copyleftdev/whatthediff/releases/latest)
+[![Version](https://img.shields.io/badge/version-1.5.0-0090ff)](https://github.com/copyleftdev/whatthediff/releases/latest)
 [![Zig](https://img.shields.io/badge/Zig-0.14-f7a41d?logo=zig&logoColor=white)](https://ziglang.org)
-[![Tests](https://img.shields.io/badge/tests-89%2F89-brightgreen)](#-testing)
-[![Property iterations](https://img.shields.io/badge/property_iterations-1535-brightgreen)](#-testing)
+[![Tests](https://img.shields.io/badge/tests-93%2F93-brightgreen)](#-testing)
+[![Property iterations](https://img.shields.io/badge/property_iterations-1685-brightgreen)](#-testing)
 [![Scale](https://img.shields.io/badge/1M_files-22µs%2Ffile-blue)](#-scale)
 [![Deterministic](https://img.shields.io/badge/reports-byte--identical-8A2BE2)](#-testing)
 [![Dependencies](https://img.shields.io/badge/dependencies-0-lightgrey)](#-architecture)
@@ -71,6 +71,7 @@ Artifacts are never compared as raw text. Each is decomposed into
 | `heading`   | Markdown                         | `h2:Deployment`                |
 | `line`      | PDF text, text fallback          | normalized text line           |
 | `chunk`     | binaries / executables (SSDeep-style) | content-defined chunk hash |
+| `kv` (bag)  | executable imports/exports/sections/strings | `imports[]=CreateRemoteThread` |
 
 Each primitive's identity is `BLAKE3(kind ‖ 0x00 ‖ canonical)`.
 **The canonical form is cross-format**: `{"db":{"port":5432}}` in JSON,
@@ -115,7 +116,7 @@ curl -fsSL https://raw.githubusercontent.com/copyleftdev/whatthediff/main/instal
 irm https://raw.githubusercontent.com/copyleftdev/whatthediff/main/install.ps1 | iex
 ```
 
-Pin a version with `WTD_VERSION=v1.4.0`, choose a directory with
+Pin a version with `WTD_VERSION=v1.5.0`, choose a directory with
 `WTD_INSTALL_DIR`. Or grab a binary yourself from
 [Releases](../../releases) — static, zero-install, for Linux
 (x86_64/aarch64, fully static musl), macOS (Intel/Apple Silicon), and
@@ -278,6 +279,36 @@ Mach-O, Wasm, and JVM/ar formats are recognized; any other binary is chunked
 generically. Executable extensions (`.exe .dll .so .dylib .bin .o .wasm` …)
 route here, and extensionless files that sniff as binary do too.
 
+### Structured RE features — triage on meaning, not opaque bytes
+
+Chunks cluster binaries, but `chunk a1b2c3…` tells an analyst nothing. So wtd
+also lifts the facts a reverse engineer actually triages on and emits them as
+primitives that flow through the *same* engine:
+
+| primitive | from |
+|---|---|
+| `imports[]=` / `exports[]=` | ELF dynsym · PE import/export dirs · Mach-O symtab |
+| `needs[]=` | shared libraries / imported DLLs |
+| `sections[]=` | section / segment names |
+| `strings[]=` | ASCII + UTF-16LE runs (all inputs, incl. raw firmware) |
+
+Now consensus/drift/factions work on *behavior*: a network tool dropped into a
+folder of coreutils is the outlier because it **uniquely imports** socket and
+TLS functions — surfaced as named evidence, not a chunk hash. A feature shared
+across a subgroup *is* a faction signature; one in a single sample is unique
+evidence. The parsers are validated against `nm`/`readelf`/`objdump`/`llvm-nm`
+on real binaries — imports, exports, needs, and sections match exactly — and
+every parser is bounds-checked, so a truncated or hostile binary yields fewer
+features, never a crash.
+
+```console
+$ wtd ./coreutils-and-curl        # curl.bin flagged at 0.990 drift
+  Evidence — unique primitives
+    curl.bin
+      imports[]=curl_easy_ssls_export     # behavior no coreutil has
+      ...
+```
+
 ## 🧪 Testing
 
 Three deterministic layers:
@@ -392,9 +423,13 @@ original spec (SSDeep-class binary analysis, secret-safe schema comparison).
 - [x] CI gate (v1.4.0: `--fail-on conflicts|outliers|drift>F` exits 3 on policy
   violation — turns wtd into a pipeline guard; verdict in text + JSON;
   property-tested against an independent threshold oracle)
+- [x] Structured RE features (v1.5.0: ELF/PE/Mach-O imports, exports, sections,
+  needed libs, and strings as primitives — triage binaries by behavior;
+  parsers validated exactly against nm/readelf/objdump/llvm-nm)
 
-*Still ideas:* semantic source-code extractors, pairwise similarity matrix
-export, and a `wtd triage` recipe for malware sample sets.
+*Next:* discriminative family signatures → **candidate YARA rules** built on the
+structured features above. *Still ideas:* semantic source-code extractors,
+pairwise similarity matrix export, a `wtd triage` recipe for malware sets.
 
 ## 📜 Design notes
 

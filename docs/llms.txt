@@ -30,6 +30,15 @@ Key facts:
   Cross-format (a JSON value reconciles against the same key in YAML). List keys
   are bags and never flagged; identifier fields where every file differs are
   excluded. Under `--keys-only` no values are compared, so it stays secret-safe.
+- Structured executable intelligence: for ELF, PE, and Mach-O binaries, wtd
+  extracts the features a reverse engineer triages on — imports, exports,
+  section names, needed libraries, and ASCII/UTF-16 strings — as list
+  primitives (`imports[]=CreateRemoteThread`, `needs[]=libc.so.6`,
+  `sections[]=.text`, `strings[]=...`). They flow through the same
+  consensus/drift/faction engine, so a binary that uniquely imports socket or
+  TLS functions is the outlier by behavior, with the imports as named evidence
+  (not opaque chunk hashes). Parsers validated against nm/readelf/objdump/
+  llvm-nm on real binaries; bounds-checked so a hostile binary never crashes.
 - CI gate (`wtd <dir> --fail-on <spec>`): exits 3 when the corpus violates a
   policy, so a pipeline can block a bad change. `<spec>` is a comma-separated
   list of conditions — `conflicts[>N]`, `outliers[>N]`, `drift>F` (a bare count

@@ -7,7 +7,7 @@ const render = @import("render.zig");
 const ask = @import("ask.zig");
 const gate = @import("gate.zig");
 
-pub const version = "1.4.0";
+pub const version = "1.5.0";
 
 const usage =
     \\wtd — WhatTheDiff: what actually matters across N artifacts

@@ -37,7 +37,7 @@
       "alternateName": "wtd",
       "applicationCategory": "DeveloperApplication",
       "operatingSystem": "Linux, macOS, Windows",
-      "softwareVersion": "1.4.0",
+      "softwareVersion": "1.5.0",
       "description": "Deterministic semantic diff for N artifacts: compares many files at once — configs, JSON, YAML, XML, PDF, and even executables via SSDeep-class content-defined chunking — to find consensus, drift, outliers and variant families, backing every claim with inspectable evidence. The deterministic engine is the source of truth; an AI only explains what the engine proved.",
       "url": "https://copyleftdev.github.io/whatthediff/",
       "downloadUrl": "https://github.com/copyleftdev/whatthediff/releases/latest",
@@ -439,7 +439,7 @@
   <div class="hero">
     <div class="wrap">
       <div>
-        <span class="eyebrow rise">Deterministic semantic diff · v1.4.0</span>
+        <span class="eyebrow rise">Deterministic semantic diff · v1.5.0</span>
         <h1 class="rise">The diff that answers<br>“what actually matters?”</h1>
         <p class="lede rise">Point <strong>wtd</strong> at a directory of configs, contracts, or JSON.
         It finds the <strong>consensus</strong>, ranks the <strong>drift</strong>, flags the
@@ -725,6 +725,17 @@ Corpus: 5 artifacts · 12 distinct primitives · 34 observations
       </div>
 
       <div class="keys-only-block">
+        <h3>Triage on meaning, not opaque bytes</h3>
+        <p class="sub">Chunks cluster binaries, but <code style="font-family:var(--mono);font-size:.85em">chunk a1b2c3…</code>
+        tells an analyst nothing. So wtd also lifts the facts a reverse engineer actually triages on — <strong>imports,
+        exports, section names, needed libraries, and ASCII/UTF-16 strings</strong> — from ELF, PE, and Mach-O, and emits them
+        as primitives through the same engine. A network tool dropped into a folder of coreutils becomes the outlier because it
+        <em>uniquely imports</em> socket and TLS functions, surfaced as named evidence. The parsers are validated against
+        <code style="font-family:var(--mono);font-size:.85em">nm</code>/<code style="font-family:var(--mono);font-size:.85em">readelf</code>/<code style="font-family:var(--mono);font-size:.85em">objdump</code>/<code style="font-family:var(--mono);font-size:.85em">llvm-nm</code>
+        on real binaries — imports, exports, needs and sections match exactly — and bounds-checked so a hostile binary never crashes.</p>
+      </div>
+
+      <div class="keys-only-block">
         <h3>Same engine, pointed at secrets: <code>--keys-only</code></h3>
         <p class="sub">The faction engine doesn't care what it's clustering. Point it at a folder of
         <code>.env</code> files with <code>--keys-only</code> and it compares them by <em>key schema</em>,
@@ -780,7 +791,7 @@ copyleftdev/whatthediff/main/install.ps1 | iex</pre>
         <svg class="icon" viewBox="0 0 15 15" fill="none" aria-hidden="true"><path d="M7.49915 0.877045C11.1566 0.877045 14.1218 3.84178 14.1222 7.49911C14.1222 11.1568 11.1568 14.1222 7.49915 14.1222C3.84181 14.1218 0.877075 11.1565 0.877075 7.49911C0.877486 3.84203 3.84206 0.877456 7.49915 0.877045ZM7.49915 1.82626C4.36673 1.82667 1.8267 4.3667 1.82629 7.49911C1.82629 10.6319 4.36648 13.1716 7.49915 13.172C10.6321 13.172 13.172 10.6321 13.172 7.49911C13.1716 4.36645 10.6319 1.82626 7.49915 1.82626ZM9.34094 4.96201C9.49988 4.73626 9.81241 4.68202 10.0382 4.84091C10.2639 4.99988 10.3182 5.31242 10.1593 5.53818L6.99231 10.0382C6.90692 10.1594 6.7719 10.236 6.62415 10.2481C6.47636 10.2602 6.33063 10.2064 6.22668 10.1007L4.64368 8.4874L5.00012 8.13779L5.35657 7.7872L6.51965 8.97079L9.34094 4.96201ZM4.64954 7.78036C4.84653 7.58696 5.16309 7.5903 5.35657 7.7872L4.64368 8.4874C4.45023 8.29035 4.4525 7.97382 4.64954 7.78036Z" fill="currentColor"/></svg>
         <span>Both installers verify the download against the release's published
         <code style="font-family:var(--mono);font-size:.85em">SHA256SUMS</code> before installing — and refuse on mismatch.
-        Pin a version with <code style="font-family:var(--mono);font-size:.85em">WTD_VERSION=v1.4.0</code>, or grab binaries yourself from
+        Pin a version with <code style="font-family:var(--mono);font-size:.85em">WTD_VERSION=v1.5.0</code>, or grab binaries yourself from
         <a href="https://github.com/copyleftdev/whatthediff/releases/latest">GitHub Releases</a>.</span>
       </div>
     </div>
