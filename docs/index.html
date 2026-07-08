@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>WhatTheDiff — semantic diff, drift &amp; outlier detection CLI</title>
-<meta name="description" content="Open-source CLI that compares hundreds of configs, JSON or YAML files at once: finds consensus, ranks drift, flags outliers, and proves every claim with evidence. ~20µs per file, proven to one million files. Linux, macOS, Windows.">
+<title>WhatTheDiff — semantic diff &amp; fuzzy binary similarity CLI</title>
+<meta name="description" content="Compare N files by meaning — configs, JSON, YAML, XML, PDF, even executables (SSDeep-class fuzzy hashing). Consensus, drift, outliers and variant families, backed by evidence.">
 <link rel="canonical" href="https://copyleftdev.github.io/whatthediff/">
 <meta name="theme-color" content="#fcfcfd">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
@@ -15,7 +15,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="WhatTheDiff">
 <meta property="og:title" content="WhatTheDiff — the diff that answers “what actually matters?”">
-<meta property="og:description" content="Point it at N files. It finds the consensus, ranks the drift, flags the outlier — and proves it. ~20µs/file, measured to 1,000,000 artifacts.">
+<meta property="og:description" content="Point it at N files — configs, docs, even executables. It finds the consensus, ranks the drift, flags the outlier — and proves it. ~20µs/file, to 1,000,000 artifacts.">
 <meta property="og:url" content="https://copyleftdev.github.io/whatthediff/">
 <meta property="og:image" content="https://copyleftdev.github.io/whatthediff/og.png">
 <meta property="og:image:width" content="1200">
@@ -23,7 +23,7 @@
 <meta property="og:image:alt" content="WhatTheDiff — deterministic semantic diff CLI showing a drift report with a flagged outlier">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="WhatTheDiff — the diff that answers “what actually matters?”">
-<meta name="twitter:description" content="Consensus, drift and outliers across N files — with evidence for every claim. ~20µs/file to 1M files. Zero dependencies.">
+<meta name="twitter:description" content="Consensus, drift, outliers and variant families across N files — even executables (SSDeep-class). Evidence for every claim. Zero dependencies.">
 <meta name="twitter:image" content="https://copyleftdev.github.io/whatthediff/og.png">
 
 <!-- Structured data for search engines and LLM crawlers -->
@@ -38,7 +38,7 @@
       "applicationCategory": "DeveloperApplication",
       "operatingSystem": "Linux, macOS, Windows",
       "softwareVersion": "0.8.0",
-      "description": "Deterministic semantic diff for N artifacts: compares many configs, JSON, YAML or text files at once, finds consensus, ranks drift, flags outliers, and backs every claim with inspectable evidence. The deterministic engine is the source of truth; an AI only explains what the engine proved.",
+      "description": "Deterministic semantic diff for N artifacts: compares many files at once — configs, JSON, YAML, XML, PDF, and even executables via SSDeep-class content-defined chunking — to find consensus, drift, outliers and variant families, backing every claim with inspectable evidence. The deterministic engine is the source of truth; an AI only explains what the engine proved.",
       "url": "https://copyleftdev.github.io/whatthediff/",
       "downloadUrl": "https://github.com/copyleftdev/whatthediff/releases/latest",
       "installUrl": "https://copyleftdev.github.io/whatthediff/#install",
@@ -397,7 +397,7 @@
 <header class="site">
   <div class="wrap">
     <a class="wordmark" href="#" aria-label="WhatTheDiff home">
-      <img src="peek.png" alt="" aria-hidden="true">
+      <img src="peek.png" alt="Peek, the WhatTheDiff mascot">
       WhatTheDiff
     </a>
     <nav class="main" aria-label="Main">
