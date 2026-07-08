@@ -4,10 +4,10 @@
 
 **Traditional diff tools answer *"what changed?"* — WTD answers *"what actually matters?"***
 
-[![Version](https://img.shields.io/badge/version-1.6.0-0090ff)](https://github.com/copyleftdev/whatthediff/releases/latest)
+[![Version](https://img.shields.io/badge/version-1.7.0-0090ff)](https://github.com/copyleftdev/whatthediff/releases/latest)
 [![Zig](https://img.shields.io/badge/Zig-0.14-f7a41d?logo=zig&logoColor=white)](https://ziglang.org)
-[![Tests](https://img.shields.io/badge/tests-96%2F96-brightgreen)](#-testing)
-[![Property iterations](https://img.shields.io/badge/property_iterations-1765-brightgreen)](#-testing)
+[![Tests](https://img.shields.io/badge/tests-101%2F101-brightgreen)](#-testing)
+[![Property iterations](https://img.shields.io/badge/property_iterations-1915-brightgreen)](#-testing)
 [![Scale](https://img.shields.io/badge/1M_files-22µs%2Ffile-blue)](#-scale)
 [![Deterministic](https://img.shields.io/badge/reports-byte--identical-8A2BE2)](#-testing)
 [![Dependencies](https://img.shields.io/badge/dependencies-0-lightgrey)](#-architecture)
@@ -72,6 +72,7 @@ Artifacts are never compared as raw text. Each is decomposed into
 | `line`      | PDF text, text fallback          | normalized text line           |
 | `chunk`     | binaries / executables (SSDeep-style) | content-defined chunk hash |
 | `kv` (bag)  | executable imports/exports/sections/strings | `imports[]=CreateRemoteThread` |
+| `kv` (bag)  | HTML/DOM structure, form fields, resource hosts | `shape[]=a1b2c3`, `field[]=password` |
 
 Each primitive's identity is `BLAKE3(kind ‖ 0x00 ‖ canonical)`.
 **The canonical form is cross-format**: `{"db":{"port":5432}}` in JSON,
@@ -116,7 +117,7 @@ curl -fsSL https://raw.githubusercontent.com/copyleftdev/whatthediff/main/instal
 irm https://raw.githubusercontent.com/copyleftdev/whatthediff/main/install.ps1 | iex
 ```
 
-Pin a version with `WTD_VERSION=v1.6.0`, choose a directory with
+Pin a version with `WTD_VERSION=v1.7.0`, choose a directory with
 `WTD_INSTALL_DIR`. Or grab a binary yourself from
 [Releases](../../releases) — static, zero-install, for Linux
 (x86_64/aarch64, fully static musl), macOS (Intel/Apple Silicon), and
@@ -142,6 +143,7 @@ scripts/release.sh                  # test + package dist/*.tar.gz|zip + SHA256S
 | `wtd configs/ --json --evidence` | uncapped occurrence lists |
 | `wtd ask "<question>" configs/` | AI explains the evidence (see below) |
 | `wtd yara ./samples` | candidate YARA rule per detected binary family |
+| `wtd ./pages --factions` | cluster captured web pages — find the shared phishing kit |
 
 > **Secret-safe schema comparison.** `--keys-only` drops the value from every
 > `key=value` primitive (`db.port=5432` → `db.port`) and hashes structureless
@@ -310,6 +312,34 @@ $ wtd ./coreutils-and-curl        # curl.bin flagged at 0.990 drift
       ...
 ```
 
+## 🌐 Web pages & phishing-kit clustering
+
+A captured DOM is just another artifact. Point wtd at a folder of saved HTML
+pages and it decomposes each into **structural facts** — a fuzzy skeleton
+(`shape[]`, w-shingles of the tag stream), form field names (`field[]`), the
+form's action host, and external resource hosts — then runs the same
+consensus / drift / **faction** engine. A phishing kit reused across many
+domains produces near-identical structure, so it clusters even when every
+deployment is rebranded:
+
+```console
+$ wtd ./captured-pages --factions
+  faction of 4 · cohesion 0.95
+    members: deploy-northbank.html, deploy-westcu.html, deploy-pacific.html, deploy-metro.html
+    shared: field[]=email · field[]=password · field[]=otp   # what the kit harvests
+    shared: formaction[]=collect.kit-hoster.example          # where it exfiltrates
+    shared: formfields[]=bd2123…                             # the field-set fingerprint
+```
+
+Four pages impersonating four different banks — one kit, surfaced by structure,
+not branding. The whole trick is **normalization**: hashed class names, session
+tokens, inline styles and injected ads are dropped, repeated siblings collapse
+to a bag, and the tag-stream is w-shingled so an injected element only disturbs
+local windows (property-tested: reformatting never changes a primitive). A kit
+shows up as a *faction* when it's a minority among diverse pages — exactly how
+you'd scan a suspect set. Feed pre-captured DOM snapshots today (`.html` files);
+`wtd web <url>…` fetching lands next.
+
 ### `wtd yara` — turn a family into a detection rule
 
 Clustering tells you *these are related*. The next step an analyst needs is
@@ -464,9 +494,12 @@ original spec (SSDeep-class binary analysis, secret-safe schema comparison).
 - [x] Discriminative family signatures → candidate YARA rules (v1.6.0:
   `wtd yara` emits a rule per family from features exclusive to its members;
   soundness property-tested — every atom's witness set equals the member set)
+- [x] HTML/DOM extractor for web-page clustering (v1.7.0: structural shingles,
+  form fields, resource hosts → phishing-kit / clone detection over captured
+  pages; formatting-invariance property-tested)
 
-*Still ideas:* semantic source-code extractors, pairwise similarity matrix
-export, and a `wtd triage` recipe for sample sets.
+*Next:* `wtd web <url>…` fetching + DOM signatures. *Still ideas:* semantic
+source-code extractors, pairwise similarity matrix export, a `wtd triage` recipe.
 
 ## 📜 Design notes
 

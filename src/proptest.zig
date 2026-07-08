@@ -520,6 +520,128 @@ test "property: every embedded string is recovered from a blob" {
     }
 }
 
+// --------------------------------------------- html / dom -----------------
+
+const html_extractor = @import("extractors/html.zig");
+
+const HtmlNode = union(enum) {
+    element: struct { tag: []const u8, attrs: []Attr, children: []HtmlNode },
+    text: []const u8,
+
+    const Attr = struct { name: []const u8, value: []const u8 };
+};
+
+const html_tags = [_][]const u8{ "div", "span", "section", "ul", "li", "p", "a", "header", "footer" };
+
+fn genHtmlNode(arena: std.mem.Allocator, rand: std.Random, depth: usize) !HtmlNode {
+    if (depth == 0 or rand.float(f64) < 0.3) {
+        return .{ .text = try std.fmt.allocPrint(arena, "t{d}", .{rand.uintLessThan(u16, 100)}) };
+    }
+    // Occasionally a form with inputs, to exercise field/formfields/action.
+    if (rand.float(f64) < 0.25) {
+        const n_in = rand.intRangeAtMost(usize, 1, 3);
+        const kids = try arena.alloc(HtmlNode, n_in);
+        for (kids) |*k| {
+            const attrs = try arena.alloc(HtmlNode.Attr, 2);
+            attrs[0] = .{ .name = "type", .value = "text" };
+            attrs[1] = .{ .name = "name", .value = try std.fmt.allocPrint(arena, "fld{d}", .{rand.uintLessThan(u16, 50)}) };
+            k.* = .{ .element = .{ .tag = "input", .attrs = attrs, .children = &.{} } };
+        }
+        const fattrs = try arena.alloc(HtmlNode.Attr, 1);
+        fattrs[0] = .{ .name = "action", .value = "https://host.example/go.php" };
+        return .{ .element = .{ .tag = "form", .attrs = fattrs, .children = kids } };
+    }
+    const n = rand.intRangeAtMost(usize, 1, 3);
+    const kids = try arena.alloc(HtmlNode, n);
+    for (kids) |*k| k.* = try genHtmlNode(arena, rand, depth - 1);
+    const tag = html_tags[rand.uintLessThan(usize, html_tags.len)];
+    const attrs = try arena.alloc(HtmlNode.Attr, 1);
+    attrs[0] = .{ .name = "id", .value = try std.fmt.allocPrint(arena, "n{d}", .{rand.uintLessThan(u16, 100)}) };
+    return .{ .element = .{ .tag = tag, .attrs = attrs, .children = kids } };
+}
+
+fn renderHtml(node: HtmlNode, rand: std.Random, noisy: bool, out: *std.ArrayList(u8)) !void {
+    switch (node) {
+        .text => |t| try out.appendSlice(t),
+        .element => |e| {
+            const void_el = std.mem.eql(u8, e.tag, "input");
+            try out.append('<');
+            try out.appendSlice(e.tag);
+            // Attribute order is irrelevant to the extractor: shuffle when noisy.
+            const order = try renderAttrs(e.attrs, rand, noisy, out);
+            _ = order;
+            if (void_el) {
+                try out.append('>');
+                return;
+            }
+            try out.append('>');
+            if (noisy) try noise(rand, out);
+            for (e.children) |c| {
+                try renderHtml(c, rand, noisy, out);
+                if (noisy) try noise(rand, out);
+            }
+            try out.appendSlice("</");
+            try out.appendSlice(e.tag);
+            try out.append('>');
+        },
+    }
+}
+
+fn renderAttrs(attrs: []const HtmlNode.Attr, rand: std.Random, noisy: bool, out: *std.ArrayList(u8)) !void {
+    const idx = try std.testing.allocator.alloc(usize, attrs.len);
+    defer std.testing.allocator.free(idx);
+    for (idx, 0..) |*v, i| v.* = i;
+    if (noisy) rand.shuffle(usize, idx);
+    for (idx) |i| {
+        try out.append(' ');
+        try out.appendSlice(attrs[i].name);
+        try out.appendSlice("=\"");
+        try out.appendSlice(attrs[i].value);
+        try out.append('"');
+    }
+}
+
+fn noise(rand: std.Random, out: *std.ArrayList(u8)) !void {
+    const chars = " \n\t";
+    var n = rand.uintLessThan(u8, 3);
+    while (n > 0) : (n -= 1) try out.append(chars[rand.uintLessThan(usize, 3)]);
+}
+
+test "property: whitespace and attribute order never change DOM primitives" {
+    var iter: u64 = 0;
+    while (iter < 150) : (iter += 1) {
+        const seed = 0x5eed_0010 + iter;
+        errdefer std.debug.print("\ncounterexample: dom-invariance property, seed=0x{x}\n", .{seed});
+
+        var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena_state.deinit();
+        const arena = arena_state.allocator();
+        var prng = std.Random.DefaultPrng.init(seed);
+        const rand = prng.random();
+
+        const tree = try genHtmlNode(arena, rand, 5);
+
+        var clean = std.ArrayList(u8).init(arena);
+        try clean.appendSlice("<html><body>");
+        try renderHtml(tree, rand, false, &clean);
+        try clean.appendSlice("</body></html>");
+
+        var dirty = std.ArrayList(u8).init(arena);
+        try dirty.appendSlice("<html><body>");
+        try renderHtml(tree, rand, true, &dirty);
+        try dirty.appendSlice("</body></html>");
+
+        const pa = try html_extractor.extract(arena, clean.items);
+        const pb = try html_extractor.extract(arena, dirty.items);
+
+        // Same document, reformatted → identical primitive set.
+        const ca = try sortedCanonicals(arena, pa);
+        const cb = try sortedCanonicals(arena, pb);
+        try std.testing.expectEqual(ca.len, cb.len);
+        for (ca, cb) |x, y| try std.testing.expectEqualStrings(x, y);
+    }
+}
+
 // --------------------------------------------- family signatures ----------
 
 const yara_mod = @import("yara.zig");

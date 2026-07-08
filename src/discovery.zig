@@ -75,6 +75,8 @@ pub fn kindFromPath(path: []const u8) types.ArtifactKind {
         .{ ".yaml", types.ArtifactKind.yaml },
         .{ ".yml", types.ArtifactKind.yaml },
         .{ ".xml", types.ArtifactKind.xml },
+        .{ ".html", types.ArtifactKind.html },
+        .{ ".htm", types.ArtifactKind.html },
         .{ ".pdf", types.ArtifactKind.pdf },
         .{ ".cbor", types.ArtifactKind.cbor },
         .{ ".exe", types.ArtifactKind.binary },

@@ -7,6 +7,7 @@ const types = @import("types.zig");
 const json = @import("extractors/json.zig");
 const yamlish = @import("extractors/yamlish.zig");
 const xml = @import("extractors/xml.zig");
+const html = @import("extractors/html.zig");
 const pdf = @import("extractors/pdf.zig");
 const binary = @import("extractors/binary.zig");
 const cbor = @import("extractors/cbor.zig");
@@ -25,6 +26,7 @@ pub fn extract(
             else => |e| e,
         },
         .yaml => yamlish.extract(arena, content),
+        .html => html.extract(arena, content),
         .xml => xml.extract(arena, content) catch |err| switch (err) {
             error.Unparseable => text.extract(arena, content),
             else => |e| e,
@@ -52,6 +54,12 @@ pub fn extract(
                 } else |_| {}
             }
             if (lead.len > 0 and lead[0] == '<') {
+                // Distinguish an HTML document from generic XML by its markers.
+                if (std.ascii.startsWithIgnoreCase(lead, "<!doctype html") or
+                    looksLikeHtml(lead))
+                {
+                    break :blk try html.extract(arena, content);
+                }
                 if (xml.extract(arena, content)) |prims| {
                     break :blk prims;
                 } else |_| {}
@@ -64,6 +72,15 @@ pub fn extract(
             break :blk text.extract(arena, content);
         },
     };
+}
+
+/// Cheap check for an HTML root element among the first few bytes.
+fn looksLikeHtml(lead: []const u8) bool {
+    const head = lead[0..@min(lead.len, 64)];
+    for ([_][]const u8{ "<html", "<head", "<body" }) |m| {
+        if (std.ascii.indexOfIgnoreCase(head, m) != null) return true;
+    }
+    return false;
 }
 
 test "malformed json degrades to line primitives" {

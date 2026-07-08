@@ -9,7 +9,7 @@ const gate = @import("gate.zig");
 const yara = @import("yara.zig");
 const binary = @import("extractors/binary.zig");
 
-pub const version = "1.6.0";
+pub const version = "1.7.0";
 
 const usage =
     \\wtd — WhatTheDiff: what actually matters across N artifacts

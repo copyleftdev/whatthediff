@@ -39,6 +39,16 @@ Key facts:
   TLS functions is the outlier by behavior, with the imports as named evidence
   (not opaque chunk hashes). Parsers validated against nm/readelf/objdump/
   llvm-nm on real binaries; bounds-checked so a hostile binary never crashes.
+- Web page / DOM clustering (captured `.html` snapshots): wtd decomposes each
+  page into structural facts — a fuzzy tag-stream skeleton (`shape[]` shingles),
+  form field names (`field[]`), the form action host (`formaction[]`), and
+  external resource hosts (`resource[]`) — and runs the same consensus/drift/
+  faction engine. A phishing kit reused across domains clusters into a faction
+  even when each deployment is rebranded, with a signature showing what it
+  harvests (email/password/otp) and where it posts. Normalization drops hashed
+  class names, session tokens, inline styles and injected ads; repeated siblings
+  collapse to a bag; reformatting never changes a primitive (property-tested).
+  Anchored on phishing-kit / clone detection. `wtd web <url>` fetching planned.
 - Candidate YARA rules (`wtd yara <dir>`): turns each detected binary family
   into a detection rule. For every faction it computes the discriminative core —
   features present in every member and absent from every other sample in the
