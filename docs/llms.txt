@@ -53,6 +53,11 @@ Key facts:
   an external headless capture fed as .html snapshots); URLs become the artifact
   names and `--snapshot-dir <dir>` saves what was fetched so a run is
   reproducible (fetching is I/O, analysis over the bytes is deterministic).
+  `wtd kit <dir>` emits a kit signature per web family — the harvested form
+  fields, form action host, resource hosts, and exclusive skeleton shingles
+  (the web analog of `wtd yara`); every atom's witness set equals the member
+  set exactly, so it matches the whole family and nothing else in the corpus.
+  Text and `wtd.kit.v1` JSON output.
 - Candidate YARA rules (`wtd yara <dir>`): turns each detected binary family
   into a detection rule. For every faction it computes the discriminative core —
   features present in every member and absent from every other sample in the

@@ -4,9 +4,9 @@
 
 **Traditional diff tools answer *"what changed?"* — WTD answers *"what actually matters?"***
 
-[![Version](https://img.shields.io/badge/version-1.8.0-0090ff)](https://github.com/copyleftdev/whatthediff/releases/latest)
+[![Version](https://img.shields.io/badge/version-1.9.0-0090ff)](https://github.com/copyleftdev/whatthediff/releases/latest)
 [![Zig](https://img.shields.io/badge/Zig-0.14-f7a41d?logo=zig&logoColor=white)](https://ziglang.org)
-[![Tests](https://img.shields.io/badge/tests-103%2F103-brightgreen)](#-testing)
+[![Tests](https://img.shields.io/badge/tests-105%2F105-brightgreen)](#-testing)
 [![Property iterations](https://img.shields.io/badge/property_iterations-1915-brightgreen)](#-testing)
 [![Scale](https://img.shields.io/badge/1M_files-22µs%2Ffile-blue)](#-scale)
 [![Deterministic](https://img.shields.io/badge/reports-byte--identical-8A2BE2)](#-testing)
@@ -117,7 +117,7 @@ curl -fsSL https://raw.githubusercontent.com/copyleftdev/whatthediff/main/instal
 irm https://raw.githubusercontent.com/copyleftdev/whatthediff/main/install.ps1 | iex
 ```
 
-Pin a version with `WTD_VERSION=v1.8.0`, choose a directory with
+Pin a version with `WTD_VERSION=v1.9.0`, choose a directory with
 `WTD_INSTALL_DIR`. Or grab a binary yourself from
 [Releases](../../releases) — static, zero-install, for Linux
 (x86_64/aarch64, fully static musl), macOS (Intel/Apple Silicon), and
@@ -145,6 +145,7 @@ scripts/release.sh                  # test + package dist/*.tar.gz|zip + SHA256S
 | `wtd yara ./samples` | candidate YARA rule per detected binary family |
 | `wtd ./pages --factions` | cluster captured web pages — find the shared phishing kit |
 | `wtd web <url>… --snapshot-dir d` | fetch pages and cluster them; save reproducible snapshots |
+| `wtd kit ./pages` | kit signature per web family (fields, action host, resources) |
 
 > **Secret-safe schema comparison.** `--keys-only` drops the value from every
 > `key=value` primitive (`db.port=5432` → `db.port`) and hashes structureless
@@ -356,6 +357,30 @@ analysis over those bytes is deterministic. Per-URL failures are skipped, never
 fatal. *(You choose the targets — fetching suspected-malicious URLs touches
 attacker infra from your host; run it where that's acceptable.)*
 
+### `wtd kit` — turn a web family into a signature
+
+The web analog of `wtd yara`. For each detected family, `wtd kit` computes the
+**discriminative core** — features present in every member and absent from
+every other page — and emits a kit descriptor:
+
+```console
+$ wtd kit ./captured-pages
+Kit signature #0 — 4 members
+  members: deploy-northbank.html, deploy-westcu.html, deploy-pacific.html, deploy-metro.html
+  harvests (form fields): email, otp, password
+  field-set fingerprint:  bd2123…
+  posts to (form action): collect.kit-hoster.example
+  loads (resources):      cdn.kit-hoster.example
+  structure:              24 exclusive skeleton shingles
+```
+
+Same soundness as `wtd yara`: every atom's witness set equals the member set
+exactly, so it matches the whole family and nothing else you scanned. A family
+with only shared structure (and no fields/action/resource) is labelled a
+*structural cluster*, not a kit. Machine-readable via `--json` (`wtd.kit.v1`) —
+drop it into a SOC pipeline. Rebranded deployments still cluster because the
+signature is the kit's *function*, not its branding.
+
 ### `wtd yara` — turn a family into a detection rule
 
 Clustering tells you *these are related*. The next step an analyst needs is
@@ -515,9 +540,12 @@ original spec (SSDeep-class binary analysis, secret-safe schema comparison).
   pages; formatting-invariance property-tested)
 - [x] `wtd web <url>…` fetching (v1.8.0: zero-dep std.http GET + `--snapshot-dir`
   reproducible capture; URLs become artifact names, per-URL failures skipped)
+- [x] DOM kit signatures (v1.9.0: `wtd kit` emits a per-family descriptor —
+  harvested fields, action host, resources, skeleton — the web analog of
+  `wtd yara`; text + `wtd.kit.v1` JSON)
 
-*Next:* DOM/kit signatures (`wtd yara`-style, for web). *Still ideas:* semantic
-source-code extractors, pairwise similarity matrix export, a `wtd triage` recipe.
+*Still ideas:* semantic source-code extractors, pairwise similarity matrix
+export, a `wtd triage` recipe for sample sets.
 
 ## 📜 Design notes
 

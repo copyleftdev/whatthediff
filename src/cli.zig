@@ -7,10 +7,11 @@ const render = @import("render.zig");
 const ask = @import("ask.zig");
 const gate = @import("gate.zig");
 const yara = @import("yara.zig");
+const kit = @import("kit.zig");
 const binary = @import("extractors/binary.zig");
 const fetch = @import("fetch.zig");
 
-pub const version = "1.8.0";
+pub const version = "1.9.0";
 
 const usage =
     \\wtd — WhatTheDiff: what actually matters across N artifacts
@@ -21,6 +22,8 @@ const usage =
     \\  wtd yara <path>...   Emit candidate YARA rules for detected binary families
     \\  wtd web <url>...     Fetch pages and cluster them (phishing-kit / clone detection);
     \\                       [--snapshot-dir <dir>] saves what was fetched (reproducible)
+    \\  wtd kit <path>...    Emit a kit signature per web family (harvested fields,
+    \\                       action host, resources, skeleton) — the wtd yara for web
     \\
     \\Options:
     \\  --json        Machine-readable report (full evidence graph)
@@ -67,6 +70,9 @@ pub fn run(arena: std.mem.Allocator, args: []const []const u8) !u8 {
     }
     if (args.len > 0 and std.mem.eql(u8, args[0], "web")) {
         return runWeb(arena, args[1..]);
+    }
+    if (args.len > 0 and std.mem.eql(u8, args[0], "kit")) {
+        return runKit(arena, args[1..]);
     }
 
     var paths = std.ArrayList([]const u8).init(arena);
@@ -176,6 +182,46 @@ pub fn run(arena: std.mem.Allocator, args: []const []const u8) !u8 {
         }
         if (g.failed) return gate.exit_code;
     }
+    return 0;
+}
+
+fn runKit(arena: std.mem.Allocator, args: []const []const u8) !u8 {
+    var paths = std.ArrayList([]const u8).init(arena);
+    var as_json = false;
+    for (args) |arg| {
+        if (std.mem.eql(u8, arg, "--help") or std.mem.eql(u8, arg, "-h")) {
+            try std.io.getStdOut().writer().writeAll(usage);
+            return 0;
+        } else if (std.mem.eql(u8, arg, "--json")) {
+            as_json = true;
+        } else if (std.mem.startsWith(u8, arg, "-")) {
+            try std.io.getStdErr().writer().print("wtd: unknown kit option '{s}'\n", .{arg});
+            return 2;
+        } else try paths.append(arg);
+    }
+    if (paths.items.len == 0) {
+        try std.io.getStdErr().writer().writeAll("wtd: kit needs at least one path\n");
+        return 2;
+    }
+
+    const corpus = engine.run(arena, paths.items) catch |err| {
+        try std.io.getStdErr().writer().print("wtd: error: {s}\n", .{@errorName(err)});
+        return 1;
+    };
+    if (corpus.artifacts.len == 0) {
+        try std.io.getStdErr().writer().writeAll("wtd: no readable artifacts found\n");
+        return 1;
+    }
+
+    const sigs = try kit.signatures(arena, &corpus.store, &corpus.clusters, corpus.artifacts);
+
+    var buffered = std.io.bufferedWriter(std.io.getStdOut().writer());
+    if (as_json) {
+        try kit.renderJson(arena, buffered.writer(), sigs);
+    } else {
+        try kit.render(buffered.writer(), sigs);
+    }
+    try buffered.flush();
     return 0;
 }
 
