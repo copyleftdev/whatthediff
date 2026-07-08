@@ -115,7 +115,7 @@ curl -fsSL https://raw.githubusercontent.com/copyleftdev/whatthediff/main/instal
 irm https://raw.githubusercontent.com/copyleftdev/whatthediff/main/install.ps1 | iex
 ```
 
-Pin a version with `WTD_VERSION=v1.0.0`, choose a directory with
+Pin a version with `WTD_VERSION=v1.2.0`, choose a directory with
 `WTD_INSTALL_DIR`. Or grab a binary yourself from
 [Releases](../../releases) — static, zero-install, for Linux
 (x86_64/aarch64, fully static musl), macOS (Intel/Apple Silicon), and
