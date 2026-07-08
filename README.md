@@ -4,10 +4,10 @@
 
 **Traditional diff tools answer *"what changed?"* — WTD answers *"what actually matters?"***
 
-[![Version](https://img.shields.io/badge/version-1.5.0-0090ff)](https://github.com/copyleftdev/whatthediff/releases/latest)
+[![Version](https://img.shields.io/badge/version-1.6.0-0090ff)](https://github.com/copyleftdev/whatthediff/releases/latest)
 [![Zig](https://img.shields.io/badge/Zig-0.14-f7a41d?logo=zig&logoColor=white)](https://ziglang.org)
-[![Tests](https://img.shields.io/badge/tests-93%2F93-brightgreen)](#-testing)
-[![Property iterations](https://img.shields.io/badge/property_iterations-1685-brightgreen)](#-testing)
+[![Tests](https://img.shields.io/badge/tests-96%2F96-brightgreen)](#-testing)
+[![Property iterations](https://img.shields.io/badge/property_iterations-1765-brightgreen)](#-testing)
 [![Scale](https://img.shields.io/badge/1M_files-22µs%2Ffile-blue)](#-scale)
 [![Deterministic](https://img.shields.io/badge/reports-byte--identical-8A2BE2)](#-testing)
 [![Dependencies](https://img.shields.io/badge/dependencies-0-lightgrey)](#-architecture)
@@ -116,7 +116,7 @@ curl -fsSL https://raw.githubusercontent.com/copyleftdev/whatthediff/main/instal
 irm https://raw.githubusercontent.com/copyleftdev/whatthediff/main/install.ps1 | iex
 ```
 
-Pin a version with `WTD_VERSION=v1.5.0`, choose a directory with
+Pin a version with `WTD_VERSION=v1.6.0`, choose a directory with
 `WTD_INSTALL_DIR`. Or grab a binary yourself from
 [Releases](../../releases) — static, zero-install, for Linux
 (x86_64/aarch64, fully static musl), macOS (Intel/Apple Silicon), and
@@ -141,6 +141,7 @@ scripts/release.sh                  # test + package dist/*.tar.gz|zip + SHA256S
 | `wtd configs/ --json` | machine-readable evidence graph (`wtd.report.v1`) |
 | `wtd configs/ --json --evidence` | uncapped occurrence lists |
 | `wtd ask "<question>" configs/` | AI explains the evidence (see below) |
+| `wtd yara ./samples` | candidate YARA rule per detected binary family |
 
 > **Secret-safe schema comparison.** `--keys-only` drops the value from every
 > `key=value` primitive (`db.port=5432` → `db.port`) and hashes structureless
@@ -309,6 +310,40 @@ $ wtd ./coreutils-and-curl        # curl.bin flagged at 0.990 drift
       ...
 ```
 
+### `wtd yara` — turn a family into a detection rule
+
+Clustering tells you *these are related*. The next step an analyst needs is
+*what defines the family, and can I detect it?* `wtd yara` computes each
+family's **discriminative core** — features present in **every member and
+absent from every other sample in the corpus** — and writes a candidate YARA
+rule from them:
+
+```console
+$ wtd yara ./samples
+rule wtd_family_0
+{
+    meta:
+        description = "wtd discriminative signature for a 3-member family"
+        members = "sampleA.bin, sampleB.bin, sampleC.bin"
+    strings:
+        $imp0 = "CreateRemoteThread" ascii wide
+        $str3 = "%s\\svchost.exe" ascii wide
+        $c7   = { e8 ?? ?? ?? ?? 8b 45 fc ... }
+    condition:
+        6 of them
+}
+```
+
+The soundness guarantee is what makes it trustworthy: **an atom is emitted only
+when its witness set equals the family's member set exactly** — shared across
+the whole family, matching nothing else in the corpus you ran it on
+(property-tested). Atoms are drawn from the structured features (imports,
+strings, sections) and from discriminative code chunks (as YARA hex); symbolic,
+readable atoms are preferred over raw bytes. It's the anti-`yarGen`:
+deterministic, and every atom traces to evidence, not a heuristic. It's a
+*candidate* — "absent elsewhere" is only proven against your corpus — so review
+before shipping.
+
 ## 🧪 Testing
 
 Three deterministic layers:
@@ -426,10 +461,12 @@ original spec (SSDeep-class binary analysis, secret-safe schema comparison).
 - [x] Structured RE features (v1.5.0: ELF/PE/Mach-O imports, exports, sections,
   needed libs, and strings as primitives — triage binaries by behavior;
   parsers validated exactly against nm/readelf/objdump/llvm-nm)
+- [x] Discriminative family signatures → candidate YARA rules (v1.6.0:
+  `wtd yara` emits a rule per family from features exclusive to its members;
+  soundness property-tested — every atom's witness set equals the member set)
 
-*Next:* discriminative family signatures → **candidate YARA rules** built on the
-structured features above. *Still ideas:* semantic source-code extractors,
-pairwise similarity matrix export, a `wtd triage` recipe for malware sets.
+*Still ideas:* semantic source-code extractors, pairwise similarity matrix
+export, and a `wtd triage` recipe for sample sets.
 
 ## 📜 Design notes
 

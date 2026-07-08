@@ -37,7 +37,7 @@
       "alternateName": "wtd",
       "applicationCategory": "DeveloperApplication",
       "operatingSystem": "Linux, macOS, Windows",
-      "softwareVersion": "1.5.0",
+      "softwareVersion": "1.6.0",
       "description": "Deterministic semantic diff for N artifacts: compares many files at once — configs, JSON, YAML, XML, PDF, and even executables via SSDeep-class content-defined chunking — to find consensus, drift, outliers and variant families, backing every claim with inspectable evidence. The deterministic engine is the source of truth; an AI only explains what the engine proved.",
       "url": "https://copyleftdev.github.io/whatthediff/",
       "downloadUrl": "https://github.com/copyleftdev/whatthediff/releases/latest",
@@ -96,6 +96,11 @@
           "@type": "Question",
           "name": "Can WhatTheDiff run in CI to block bad config changes?",
           "acceptedAnswer": { "@type": "Answer", "text": "Yes. The --fail-on flag turns wtd into a CI gate: it exits with code 3 when the corpus violates a policy, so a pipeline step fails and blocks the pull request. Conditions are comma-separated and compose: 'conflicts' (or conflicts>N) fails when the fleet disagrees on a value, 'outliers' fails when any file is a drift outlier, and 'drift>0.5' fails when any file drifts past a threshold. For example, wtd ./configs --fail-on 'conflicts,drift>0.5'. Exit codes are 0 for pass, 1 for internal error, 2 for a usage mistake, and 3 for a gate failure, so CI can distinguish a policy violation from a crash. The verdict is also included in the --json output as a gate object. Combined with --keys-only it stays secret-safe, so you can gate credential and .env profiles too." }
+        },
+        {
+          "@type": "Question",
+          "name": "Can WhatTheDiff generate YARA rules for malware families?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. The 'wtd yara' command turns each detected binary family into a candidate YARA rule. For every cluster it computes the discriminative core — the imports, strings, section names, and code chunks that are present in every member of the family and absent from every other sample in the corpus — and emits a YARA rule from them, with human-readable atoms (imports and strings) preferred over raw byte patterns. The soundness guarantee is that an atom is only included when its witness set equals the family's member set exactly, so every atom is shared across the whole family and matches nothing else in the corpus you scanned; this is property-tested. It is deterministic and evidence-grounded, unlike heuristic rule generators. Because 'absent elsewhere' is only proven against the corpus you ran, the output is a candidate rule to review and refine, not a signature to ship blindly." }
         },
         {
           "@type": "Question",
@@ -439,7 +444,7 @@
   <div class="hero">
     <div class="wrap">
       <div>
-        <span class="eyebrow rise">Deterministic semantic diff · v1.5.0</span>
+        <span class="eyebrow rise">Deterministic semantic diff · v1.6.0</span>
         <h1 class="rise">The diff that answers<br>“what actually matters?”</h1>
         <p class="lede rise">Point <strong>wtd</strong> at a directory of configs, contracts, or JSON.
         It finds the <strong>consensus</strong>, ranks the <strong>drift</strong>, flags the
@@ -736,6 +741,29 @@ Corpus: 5 artifacts · 12 distinct primitives · 34 observations
       </div>
 
       <div class="keys-only-block">
+        <h3>Turn a family into a detection rule: <code>wtd yara</code></h3>
+        <p class="sub">Clustering tells you binaries are <em>related</em>; the next step is <em>what defines the family, and can I detect it?</em>
+        <code style="font-family:var(--mono);font-size:.85em">wtd yara</code> computes each family's <strong>discriminative core</strong> — features present in
+        every member and absent from every other sample in the corpus — and writes a candidate YARA rule from them. The soundness guarantee: an atom is
+        emitted only when its witness set equals the family's member set <em>exactly</em>, so it matches the whole family and nothing else you scanned.
+        It's the anti-<code style="font-family:var(--mono);font-size:.85em">yarGen</code> — deterministic, every atom traced to evidence.</p>
+        <div class="fam-term" aria-label="wtd yara candidate rule output">
+          <pre><span class="dim">$</span> <span class="hd">wtd yara ./samples</span>
+<span class="fa">rule</span> wtd_family_0 {
+  meta:
+    description = <span class="fb">"wtd signature for a 3-member family"</span>
+    members = <span class="fb">"sampleA.bin, sampleB.bin, sampleC.bin"</span>
+  strings:
+    $imp0 = <span class="fb">"CreateRemoteThread"</span> ascii wide
+    $str3 = <span class="fb">"%s\\svchost.exe"</span> ascii wide
+    $c7   = { e8 ?? ?? ?? ?? 8b 45 fc … }
+  condition:
+    6 of them
+}</pre>
+        </div>
+      </div>
+
+      <div class="keys-only-block">
         <h3>Same engine, pointed at secrets: <code>--keys-only</code></h3>
         <p class="sub">The faction engine doesn't care what it's clustering. Point it at a folder of
         <code>.env</code> files with <code>--keys-only</code> and it compares them by <em>key schema</em>,
@@ -791,7 +819,7 @@ copyleftdev/whatthediff/main/install.ps1 | iex</pre>
         <svg class="icon" viewBox="0 0 15 15" fill="none" aria-hidden="true"><path d="M7.49915 0.877045C11.1566 0.877045 14.1218 3.84178 14.1222 7.49911C14.1222 11.1568 11.1568 14.1222 7.49915 14.1222C3.84181 14.1218 0.877075 11.1565 0.877075 7.49911C0.877486 3.84203 3.84206 0.877456 7.49915 0.877045ZM7.49915 1.82626C4.36673 1.82667 1.8267 4.3667 1.82629 7.49911C1.82629 10.6319 4.36648 13.1716 7.49915 13.172C10.6321 13.172 13.172 10.6321 13.172 7.49911C13.1716 4.36645 10.6319 1.82626 7.49915 1.82626ZM9.34094 4.96201C9.49988 4.73626 9.81241 4.68202 10.0382 4.84091C10.2639 4.99988 10.3182 5.31242 10.1593 5.53818L6.99231 10.0382C6.90692 10.1594 6.7719 10.236 6.62415 10.2481C6.47636 10.2602 6.33063 10.2064 6.22668 10.1007L4.64368 8.4874L5.00012 8.13779L5.35657 7.7872L6.51965 8.97079L9.34094 4.96201ZM4.64954 7.78036C4.84653 7.58696 5.16309 7.5903 5.35657 7.7872L4.64368 8.4874C4.45023 8.29035 4.4525 7.97382 4.64954 7.78036Z" fill="currentColor"/></svg>
         <span>Both installers verify the download against the release's published
         <code style="font-family:var(--mono);font-size:.85em">SHA256SUMS</code> before installing — and refuse on mismatch.
-        Pin a version with <code style="font-family:var(--mono);font-size:.85em">WTD_VERSION=v1.5.0</code>, or grab binaries yourself from
+        Pin a version with <code style="font-family:var(--mono);font-size:.85em">WTD_VERSION=v1.6.0</code>, or grab binaries yourself from
         <a href="https://github.com/copyleftdev/whatthediff/releases/latest">GitHub Releases</a>.</span>
       </div>
     </div>

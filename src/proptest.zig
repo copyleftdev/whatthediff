@@ -520,6 +520,85 @@ test "property: every embedded string is recovered from a blob" {
     }
 }
 
+// --------------------------------------------- family signatures ----------
+
+const yara_mod = @import("yara.zig");
+
+test "property: a family signature is exactly the exclusive shared features" {
+    var iter: u64 = 0;
+    while (iter < 80) : (iter += 1) {
+        const seed = 0x5eed_000f + iter;
+        errdefer std.debug.print("\ncounterexample: signature-soundness property, seed=0x{x}\n", .{seed});
+
+        var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena_state.deinit();
+        const arena = arena_state.allocator();
+        var prng = std.Random.DefaultPrng.init(seed);
+        const rand = prng.random();
+
+        const n_conform = rand.intRangeAtMost(usize, 3, 8);
+        const m_family = rand.intRangeAtMost(usize, 2, n_conform); // keep exclusive set minority
+        const n_excl = rand.intRangeAtMost(usize, 1, 6);
+        const n_univ = rand.intRangeAtMost(usize, 1, 4);
+        const n = n_conform + m_family;
+
+        // Universal imports shared by everyone (must NOT be signature atoms).
+        const univ = try arena.alloc([]const u8, n_univ);
+        for (univ, 0..) |*u, i| u.* = try std.fmt.allocPrint(arena, "imports[]=u{d}", .{i});
+        // Exclusive imports shared only by the family (the expected signature).
+        const excl = try arena.alloc([]const u8, n_excl);
+        for (excl, 0..) |*x, i| x.* = try std.fmt.allocPrint(arena, "imports[]=ex{d}", .{i});
+
+        var store = evidence.Store.init(arena);
+        var sets = std.ArrayList([]const u32).init(arena);
+        var artifacts = std.ArrayList(types.Artifact).init(arena);
+
+        const feedOne = struct {
+            fn go(al: std.mem.Allocator, st: *evidence.Store, se: *std.ArrayList([]const u32), ar: *std.ArrayList(types.Artifact), id: u32, cs: []const []const u8) !void {
+                var set = std.ArrayList(u32).init(al);
+                for (cs) |c| {
+                    const r = try st.add(id, .{ .kind = .kv, .canonical = c, .line = 0 });
+                    if (r.first_for_artifact) try set.append(r.index);
+                }
+                try ar.append(.{ .id = id, .path = try std.fmt.allocPrint(al, "art{d}.bin", .{id}), .kind = .binary, .size = 1 });
+                try se.append(try set.toOwnedSlice());
+            }
+        }.go;
+
+        var id: u32 = 0;
+        while (id < n_conform) : (id += 1) {
+            var prims = std.ArrayList([]const u8).init(arena);
+            try prims.appendSlice(univ);
+            try prims.append(try std.fmt.allocPrint(arena, "imports[]=cn{d}", .{id}));
+            try feedOne(arena, &store, &sets, &artifacts, id, prims.items);
+        }
+        const fam_lo = id;
+        while (id < fam_lo + m_family) : (id += 1) {
+            var prims = std.ArrayList([]const u8).init(arena);
+            try prims.appendSlice(univ);
+            try prims.appendSlice(excl);
+            try prims.append(try std.fmt.allocPrint(arena, "imports[]=fn{d}", .{id}));
+            try feedOne(arena, &store, &sets, &artifacts, id, prims.items);
+        }
+
+        const anal = try analysis.analyze(arena, &store, n, sets.items);
+        const clusters = try cluster.detect(arena, &store, &anal, sets.items);
+        const fams = try yara_mod.families(arena, &store, &clusters, artifacts.items);
+
+        try std.testing.expectEqual(@as(usize, 1), fams.len);
+        try std.testing.expectEqual(m_family, fams[0].member_names.len);
+
+        // The atom set equals exactly the exclusive imports — no universals, no noise.
+        var got = std.StringHashMap(void).init(arena);
+        for (fams[0].atoms) |a| try got.put(a.text, {});
+        try std.testing.expectEqual(n_excl, got.count());
+        for (excl) |x| {
+            const bare = x["imports[]=".len..];
+            try std.testing.expect(got.contains(bare));
+        }
+    }
+}
+
 // ------------------------------------------- extractor equivalence --------
 
 const JsonNode = union(enum) {

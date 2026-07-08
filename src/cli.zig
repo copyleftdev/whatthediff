@@ -6,8 +6,10 @@ const engine = @import("engine.zig");
 const render = @import("render.zig");
 const ask = @import("ask.zig");
 const gate = @import("gate.zig");
+const yara = @import("yara.zig");
+const binary = @import("extractors/binary.zig");
 
-pub const version = "1.5.0";
+pub const version = "1.6.0";
 
 const usage =
     \\wtd — WhatTheDiff: what actually matters across N artifacts
@@ -15,6 +17,7 @@ const usage =
     \\Usage:
     \\  wtd <path>... [options]
     \\  wtd ask "<question>" [path...] [options]
+    \\  wtd yara <path>...   Emit candidate YARA rules for detected binary families
     \\
     \\Options:
     \\  --json        Machine-readable report (full evidence graph)
@@ -55,6 +58,9 @@ const usage =
 pub fn run(arena: std.mem.Allocator, args: []const []const u8) !u8 {
     if (args.len > 0 and std.mem.eql(u8, args[0], "ask")) {
         return runAsk(arena, args[1..]);
+    }
+    if (args.len > 0 and std.mem.eql(u8, args[0], "yara")) {
+        return runYara(arena, args[1..]);
     }
 
     var paths = std.ArrayList([]const u8).init(arena);
@@ -164,6 +170,64 @@ pub fn run(arena: std.mem.Allocator, args: []const []const u8) !u8 {
         }
         if (g.failed) return gate.exit_code;
     }
+    return 0;
+}
+
+fn runYara(arena: std.mem.Allocator, args: []const []const u8) !u8 {
+    var paths = std.ArrayList([]const u8).init(arena);
+    for (args) |arg| {
+        if (std.mem.eql(u8, arg, "--help") or std.mem.eql(u8, arg, "-h")) {
+            try std.io.getStdOut().writer().writeAll(usage);
+            return 0;
+        } else if (std.mem.startsWith(u8, arg, "-")) {
+            try std.io.getStdErr().writer().print("wtd: unknown yara option '{s}'\n", .{arg});
+            return 2;
+        } else try paths.append(arg);
+    }
+    if (paths.items.len == 0) {
+        try std.io.getStdErr().writer().writeAll("wtd: yara needs at least one path\n");
+        return 2;
+    }
+
+    const corpus = engine.run(arena, paths.items) catch |err| {
+        try std.io.getStdErr().writer().print("wtd: error: {s}\n", .{@errorName(err)});
+        return 1;
+    };
+    if (corpus.artifacts.len == 0) {
+        try std.io.getStdErr().writer().writeAll("wtd: no readable artifacts found\n");
+        return 1;
+    }
+
+    const fams = try yara.families(arena, &corpus.store, &corpus.clusters, corpus.artifacts);
+
+    // Resolve raw bytes for the discriminative chunk atoms by re-chunking each
+    // member file once (chunk boundaries are deterministic, so hashes match).
+    var resolved = std.StringHashMap([]const u8).init(arena);
+    var needed = std.StringHashMap(void).init(arena);
+    for (fams) |f| for (f.atoms) |a| {
+        if (a.kind == .chunk) try needed.put(a.text, {});
+    };
+    if (needed.count() > 0) {
+        var seen = std.AutoHashMap(u32, void).init(arena);
+        outer: for (fams) |f| {
+            for (f.members) |m| {
+                if (seen.contains(m)) continue;
+                try seen.put(m, {});
+                const content = std.fs.cwd().readFileAlloc(arena, corpus.artifacts[m].path, engine.max_artifact_bytes) catch continue;
+                const chs = binary.chunks(arena, content) catch continue;
+                for (chs) |c| {
+                    if (needed.contains(c.hash) and !resolved.contains(c.hash)) {
+                        try resolved.put(c.hash, c.bytes);
+                        if (resolved.count() == needed.count()) break :outer;
+                    }
+                }
+            }
+        }
+    }
+
+    var buffered = std.io.bufferedWriter(std.io.getStdOut().writer());
+    try yara.render(buffered.writer(), fams, &resolved);
+    try buffered.flush();
     return 0;
 }
 

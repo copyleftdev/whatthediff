@@ -77,6 +77,29 @@ pub fn extract(arena: std.mem.Allocator, content: []const u8) ![]types.Primitive
     return out.toOwnedSlice();
 }
 
+/// A resolved chunk: its identity hash, the raw bytes, and byte offset. Used
+/// by signature generation to lift YARA hex patterns from discriminative
+/// chunks (the evidence store keeps only the hash, not the bytes).
+pub const Chunk = struct { hash: []const u8, bytes: []const u8, offset: usize };
+
+/// Re-chunk `content` with the exact same boundaries the extractor uses,
+/// returning each chunk's hash alongside its bytes. Deterministic and
+/// identical to what `extract` produced, so hashes match the stored identities.
+pub fn chunks(arena: std.mem.Allocator, content: []const u8) ![]Chunk {
+    var out = std.ArrayList(Chunk).init(arena);
+    var start: usize = 0;
+    while (start < content.len) {
+        const end = nextBoundary(content, start);
+        try out.append(.{
+            .hash = try chunkHash(arena, content[start..end]),
+            .bytes = content[start..end],
+            .offset = start,
+        });
+        start = end;
+    }
+    return out.toOwnedSlice();
+}
+
 /// Find the end of the chunk beginning at `start`: the first content-defined
 /// boundary at or after `min_chunk` bytes, else `max_chunk`, else EOF.
 fn nextBoundary(content: []const u8, start: usize) usize {

@@ -39,6 +39,15 @@ Key facts:
   TLS functions is the outlier by behavior, with the imports as named evidence
   (not opaque chunk hashes). Parsers validated against nm/readelf/objdump/
   llvm-nm on real binaries; bounds-checked so a hostile binary never crashes.
+- Candidate YARA rules (`wtd yara <dir>`): turns each detected binary family
+  into a detection rule. For every faction it computes the discriminative core —
+  features present in every member and absent from every other sample in the
+  corpus — and writes a YARA rule from them (imports/strings/sections as text
+  atoms, discriminative code chunks as hex). Soundness: an atom is emitted only
+  when its witness set equals the family's member set exactly, so it is shared
+  across the whole family and matches nothing else in the analyzed corpus
+  (property-tested). Deterministic; the anti-yarGen. A candidate to review, not
+  a shipped signature, since "absent elsewhere" is only proven vs your corpus.
 - CI gate (`wtd <dir> --fail-on <spec>`): exits 3 when the corpus violates a
   policy, so a pipeline can block a bad change. `<spec>` is a comma-separated
   list of conditions — `conflicts[>N]`, `outliers[>N]`, `drift>F` (a bare count
@@ -65,6 +74,7 @@ Usage:
   (`--conflicts`: the agreed value per key and which files disagree)
 - `wtd <dir> --fail-on <spec>` — CI gate; exit 3 on policy violation
   (`conflicts`, `outliers`, `drift>F`, comma-separated)
+- `wtd yara <dir>` — emit candidate YARA rules for detected binary families
 - `wtd <dir> --json [--evidence]` — machine-readable evidence graph
 - `wtd <dir> --keys-only` — compare files by structure, not values (drops the
   value from key=value primitives, hashes raw lines). Secret-safe: point it at
