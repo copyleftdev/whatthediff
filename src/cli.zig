@@ -6,7 +6,7 @@ const engine = @import("engine.zig");
 const render = @import("render.zig");
 const ask = @import("ask.zig");
 
-pub const version = "0.9.0";
+pub const version = "1.0.0";
 
 const usage =
     \\wtd — WhatTheDiff: what actually matters across N artifacts

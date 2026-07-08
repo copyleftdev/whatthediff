@@ -4,8 +4,9 @@
 
 **Traditional diff tools answer *"what changed?"* — WTD answers *"what actually matters?"***
 
+[![Version](https://img.shields.io/badge/version-1.0.0-0090ff)](https://github.com/copyleftdev/whatthediff/releases/latest)
 [![Zig](https://img.shields.io/badge/Zig-0.14-f7a41d?logo=zig&logoColor=white)](https://ziglang.org)
-[![Tests](https://img.shields.io/badge/tests-64%2F64-brightgreen)](#-testing)
+[![Tests](https://img.shields.io/badge/tests-67%2F67-brightgreen)](#-testing)
 [![Property iterations](https://img.shields.io/badge/property_iterations-1065-brightgreen)](#-testing)
 [![Scale](https://img.shields.io/badge/1M_files-22µs%2Ffile-blue)](#-scale)
 [![Deterministic](https://img.shields.io/badge/reports-byte--identical-8A2BE2)](#-testing)
@@ -51,7 +52,7 @@ Evidence — unique primitives
 - **Evidence over vibes.** Every observation answers: what, where, in how many
   artifacts, and can I inspect the proof?
 - **Determinism over magic.** Same corpus in → byte-identical report out.
-  The LLM (roadmap) explains conclusions; it never invents them.
+  The optional `wtd ask` LLM layer explains conclusions; it never invents them.
 
 ## ⚙️ How it works
 
@@ -110,7 +111,7 @@ curl -fsSL https://raw.githubusercontent.com/copyleftdev/whatthediff/main/instal
 irm https://raw.githubusercontent.com/copyleftdev/whatthediff/main/install.ps1 | iex
 ```
 
-Pin a version with `WTD_VERSION=v0.5.0`, choose a directory with
+Pin a version with `WTD_VERSION=v1.0.0`, choose a directory with
 `WTD_INSTALL_DIR`. Or grab a binary yourself from
 [Releases](../../releases) — static, zero-install, for Linux
 (x86_64/aarch64, fully static musl), macOS (Intel/Apple Silicon), and
@@ -275,6 +276,11 @@ Each module is independently testable and replaceable; extractors degrade
 
 ## 🗺 Roadmap
 
+**v1.0** — the full [intent.md](intent.md) vision is shipped: deterministic
+pipeline, evidence model, consensus/drift/factions, AI explanation, cross-format
+unification, million-file scale — plus two capabilities that weren't in the
+original spec (SSDeep-class binary analysis, secret-safe schema comparison).
+
 - [x] `wtd ask "why is contract_17 different?"` — AI adapter explaining the
   evidence graph (v0.2.0: Anthropic / OpenAI-compatible / local endpoints)
 - [x] Cross-format canonical unification (v0.3.0: same fact in JSON, YAML, or
@@ -294,7 +300,12 @@ Each module is independently testable and replaceable; extractors degrade
   the SSDeep/CTPH core — so the consensus/drift/faction engine clusters
   binaries by shared code; validated clustering real compiled ELF variants
   into families; format+arch detection for ELF/PE/Mach-O/Wasm)
-- [ ] Source-code extractors (semantic, beyond line-level)
+- [x] Secret-safe schema comparison — `--keys-only` + `export` normalization
+  (v0.9.0: compare credential/env profiles by key structure, no value ever
+  reaches the report)
+
+*Post-1.0 ideas:* semantic source-code extractors, pairwise similarity matrix
+export, a `wtd triage` recipe for malware sample sets.
 
 ## 📜 Design notes
 
