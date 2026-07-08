@@ -222,6 +222,15 @@ const Parser = struct {
         const fname = try lower(self.arena, raw);
         try self.emit("field", fname, &self.counts.field);
         try self.forms.items[self.forms.items.len - 1].append(fname);
+
+        // Preserve the input's password type regardless of its name — phishing
+        // routinely obfuscates the field name (`pw`, `p`, random), but a
+        // `type=password` input is the canonical credential signal.
+        if (getAttr(attrs, "type")) |t| {
+            if (std.ascii.eqlIgnoreCase(t, "password") and !std.mem.eql(u8, fname, "password")) {
+                try self.emit("field", "password", &self.counts.field);
+            }
+        }
     }
 
     fn emitFormFields(self: *Parser) Error!void {
@@ -522,6 +531,17 @@ test "extracts form fields, action host, and resource hosts" {
     // Structural shingles are present.
     const shapes = try values(arena, prims, "shape");
     try testing.expect(shapes.len > 3);
+}
+
+test "a type=password input is surfaced regardless of its obfuscated name" {
+    var a = std.heap.ArenaAllocator.init(testing.allocator);
+    defer a.deinit();
+    const arena = a.allocator();
+    // The password field is named 'pw' — the name gives no hint, but the type does.
+    const prims = try extract(arena, "<form><input name=u><input type=password name=pw></form>");
+    const fields = try values(arena, prims, "field");
+    try testing.expect(has(fields, "pw")); // the raw name
+    try testing.expect(has(fields, "password")); // and the type signal
 }
 
 test "relative form action keeps the path segment" {

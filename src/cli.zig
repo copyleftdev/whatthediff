@@ -12,7 +12,7 @@ const creds = @import("creds.zig");
 const binary = @import("extractors/binary.zig");
 const fetch = @import("fetch.zig");
 
-pub const version = "1.11.0";
+pub const version = "1.11.1";
 
 const usage =
     \\wtd — WhatTheDiff: what actually matters across N artifacts

@@ -4,9 +4,9 @@
 
 **Traditional diff tools answer *"what changed?"* — WTD answers *"what actually matters?"***
 
-[![Version](https://img.shields.io/badge/version-1.11.0-0090ff)](https://github.com/copyleftdev/whatthediff/releases/latest)
+[![Version](https://img.shields.io/badge/version-1.11.1-0090ff)](https://github.com/copyleftdev/whatthediff/releases/latest)
 [![Zig](https://img.shields.io/badge/Zig-0.14-f7a41d?logo=zig&logoColor=white)](https://ziglang.org)
-[![Tests](https://img.shields.io/badge/tests-108%2F108-brightgreen)](#-testing)
+[![Tests](https://img.shields.io/badge/tests-109%2F109-brightgreen)](#-testing)
 [![Property iterations](https://img.shields.io/badge/property_iterations-1915-brightgreen)](#-testing)
 [![Scale](https://img.shields.io/badge/1M_files-22µs%2Ffile-blue)](#-scale)
 [![Deterministic](https://img.shields.io/badge/reports-byte--identical-8A2BE2)](#-testing)
@@ -117,7 +117,7 @@ curl -fsSL https://raw.githubusercontent.com/copyleftdev/whatthediff/main/instal
 irm https://raw.githubusercontent.com/copyleftdev/whatthediff/main/install.ps1 | iex
 ```
 
-Pin a version with `WTD_VERSION=v1.11.0`, choose a directory with
+Pin a version with `WTD_VERSION=v1.11.1`, choose a directory with
 `WTD_INSTALL_DIR`. Or grab a binary yourself from
 [Releases](../../releases) — static, zero-install, for Linux
 (x86_64/aarch64, fully static musl), macOS (Intel/Apple Silicon), and
