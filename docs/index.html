@@ -214,7 +214,14 @@
   .hero-links .plat { color:var(--slate-9); font-size:0.8125rem; }
 
   /* ---------- terminal ---------- */
+  .term-wrap { position:relative; }
+  .peek {
+    position:absolute; top:-72px; right:30px; width:130px; z-index:0;
+    user-select:none; pointer-events:none;
+  }
+  @media (max-width:900px){ .peek { width:92px; top:-52px; right:18px; } }
   .term {
+    position:relative; z-index:1;
     background:var(--slate-2);
     border:var(--border); border-radius:var(--radius-lg);
     box-shadow:0 1px 2px rgba(28,32,36,.04), 0 8px 32px rgba(28,32,36,.06);
@@ -380,7 +387,7 @@
   <div class="hero">
     <div class="wrap">
       <div>
-        <span class="eyebrow rise">Deterministic semantic diff · v0.1.0</span>
+        <span class="eyebrow rise">Deterministic semantic diff · v0.7.0</span>
         <h1 class="rise">The diff that answers<br>“what actually matters?”</h1>
         <p class="lede rise">Point <strong>wtd</strong> at a directory of configs, contracts, or JSON.
         It finds the <strong>consensus</strong>, ranks the <strong>drift</strong>, flags the
@@ -404,6 +411,8 @@
         </div>
       </div>
 
+      <div class="term-wrap">
+      <img class="peek" src="peek.png" alt="Peek, the WhatTheDiff mantis shrimp mascot, peeking over the terminal">
       <figure class="term" aria-label="Real wtd output on a five-file corpus">
         <div class="term-bar" aria-hidden="true"><i></i><i></i><i></i><span>wtd configs/ — 5 artifacts</span></div>
         <pre><span class="dim">$</span> <span class="cmd">wtd configs/</span>
@@ -427,6 +436,7 @@ Corpus: 5 artifacts · 12 distinct primitives · 34 observations
     kv   <span class="bad">tls=false</span>               <span class="dim">(line 5)</span>
     kv   <span class="bad">db.host=10.9.9.9</span>        <span class="dim">(line 3)</span></pre>
       </figure>
+      </div>
     </div>
   </div>
 
