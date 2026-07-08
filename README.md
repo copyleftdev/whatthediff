@@ -1,8 +1,6 @@
 <div align="center">
 
-<img src="docs/peek.png" width="190" alt="Peek, the WhatTheDiff mascot — a peacock mantis shrimp with huge scanning eyes, one boxing-glove club raised having spotted the outlier">
-
-# 🔍 WhatTheDiff
+# <img src="docs/peek.png" width="46" alt="Peek, the WhatTheDiff mantis shrimp mascot"> WhatTheDiff
 
 **Traditional diff tools answer *"what changed?"* — WTD answers *"what actually matters?"***
 
