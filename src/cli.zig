@@ -11,7 +11,7 @@ const kit = @import("kit.zig");
 const binary = @import("extractors/binary.zig");
 const fetch = @import("fetch.zig");
 
-pub const version = "1.9.0";
+pub const version = "1.10.0";
 
 const usage =
     \\wtd — WhatTheDiff: what actually matters across N artifacts
@@ -21,7 +21,8 @@ const usage =
     \\  wtd ask "<question>" [path...] [options]
     \\  wtd yara <path>...   Emit candidate YARA rules for detected binary families
     \\  wtd web <url>...     Fetch pages and cluster them (phishing-kit / clone detection);
-    \\                       [--snapshot-dir <dir>] saves what was fetched (reproducible)
+    \\                       [--snapshot-dir <dir>] saves what was fetched (reproducible),
+    \\                       [--timeout <sec>] per-request deadline (default 10)
     \\  wtd kit <path>...    Emit a kit signature per web family (harvested fields,
     \\                       action host, resources, skeleton) — the wtd yara for web
     \\
@@ -231,7 +232,9 @@ fn runWeb(arena: std.mem.Allocator, args: []const []const u8) !u8 {
     var opts = render.Options{};
     var as_json = false;
     var snapshot_dir: ?[]const u8 = null;
+    var timeout_ms: u64 = fetch.default_timeout_ms;
     const sd_prefix = "--snapshot-dir=";
+    const to_prefix = "--timeout=";
 
     var i: usize = 0;
     while (i < args.len) : (i += 1) {
@@ -258,6 +261,27 @@ fn runWeb(arena: std.mem.Allocator, args: []const []const u8) !u8 {
             snapshot_dir = args[i];
         } else if (std.mem.startsWith(u8, arg, sd_prefix)) {
             snapshot_dir = arg[sd_prefix.len..];
+        } else if (std.mem.eql(u8, arg, "--timeout") or std.mem.startsWith(u8, arg, to_prefix)) {
+            var val: []const u8 = undefined;
+            if (std.mem.startsWith(u8, arg, to_prefix)) {
+                val = arg[to_prefix.len..];
+            } else {
+                i += 1;
+                if (i >= args.len) {
+                    try stderr.writeAll("wtd: --timeout requires seconds (e.g. --timeout 8)\n");
+                    return 2;
+                }
+                val = args[i];
+            }
+            const secs = std.fmt.parseFloat(f64, val) catch {
+                try stderr.print("wtd: --timeout: not a number: '{s}'\n", .{val});
+                return 2;
+            };
+            if (!(secs > 0)) {
+                try stderr.writeAll("wtd: --timeout must be greater than 0\n");
+                return 2;
+            }
+            timeout_ms = @intFromFloat(secs * 1000.0);
         } else if (std.mem.startsWith(u8, arg, "-")) {
             try stderr.print("wtd: unknown web option '{s}'\n", .{arg});
             return 2;
@@ -279,7 +303,7 @@ fn runWeb(arena: std.mem.Allocator, args: []const []const u8) !u8 {
             try stderr.print("wtd: skipping non-http url '{s}'\n", .{url});
             continue;
         }
-        const resp = fetch.get(arena, url) catch |err| {
+        const resp = fetch.get(arena, url, timeout_ms) catch |err| {
             try stderr.print("wtd: fetch failed for {s}: {s}\n", .{ url, @errorName(err) });
             continue;
         };

@@ -4,9 +4,9 @@
 
 **Traditional diff tools answer *"what changed?"* — WTD answers *"what actually matters?"***
 
-[![Version](https://img.shields.io/badge/version-1.9.0-0090ff)](https://github.com/copyleftdev/whatthediff/releases/latest)
+[![Version](https://img.shields.io/badge/version-1.10.0-0090ff)](https://github.com/copyleftdev/whatthediff/releases/latest)
 [![Zig](https://img.shields.io/badge/Zig-0.14-f7a41d?logo=zig&logoColor=white)](https://ziglang.org)
-[![Tests](https://img.shields.io/badge/tests-105%2F105-brightgreen)](#-testing)
+[![Tests](https://img.shields.io/badge/tests-106%2F106-brightgreen)](#-testing)
 [![Property iterations](https://img.shields.io/badge/property_iterations-1915-brightgreen)](#-testing)
 [![Scale](https://img.shields.io/badge/1M_files-22µs%2Ffile-blue)](#-scale)
 [![Deterministic](https://img.shields.io/badge/reports-byte--identical-8A2BE2)](#-testing)
@@ -117,7 +117,7 @@ curl -fsSL https://raw.githubusercontent.com/copyleftdev/whatthediff/main/instal
 irm https://raw.githubusercontent.com/copyleftdev/whatthediff/main/install.ps1 | iex
 ```
 
-Pin a version with `WTD_VERSION=v1.9.0`, choose a directory with
+Pin a version with `WTD_VERSION=v1.10.0`, choose a directory with
 `WTD_INSTALL_DIR`. Or grab a binary yourself from
 [Releases](../../releases) — static, zero-install, for Linux
 (x86_64/aarch64, fully static musl), macOS (Intel/Apple Silicon), and
@@ -144,7 +144,7 @@ scripts/release.sh                  # test + package dist/*.tar.gz|zip + SHA256S
 | `wtd ask "<question>" configs/` | AI explains the evidence (see below) |
 | `wtd yara ./samples` | candidate YARA rule per detected binary family |
 | `wtd ./pages --factions` | cluster captured web pages — find the shared phishing kit |
-| `wtd web <url>… --snapshot-dir d` | fetch pages and cluster them; save reproducible snapshots |
+| `wtd web <url>… [--timeout s] [--snapshot-dir d]` | fetch pages and cluster them; bounded, reproducible |
 | `wtd kit ./pages` | kit signature per web family (fields, action host, resources) |
 
 > **Secret-safe schema comparison.** `--keys-only` drops the value from every
@@ -349,13 +349,31 @@ wtd: fetched 8/8 URLs
   faction of 6 · cohesion 0.94   # one kit across six domains
 ```
 
-`wtd web` retrieves raw HTML over a zero-dep `std.http` client (server-rendered
-pages — JS-heavy SPAs need an external headless capture fed as snapshots), the
-report shows the **URLs** as artifact names, and `--snapshot-dir` persists
-exactly what was fetched so the analysis is reproducible: fetching is I/O, the
-analysis over those bytes is deterministic. Per-URL failures are skipped, never
-fatal. *(You choose the targets — fetching suspected-malicious URLs touches
-attacker infra from your host; run it where that's acceptable.)*
+`wtd web` retrieves raw HTML over a zero-dep `std.http` client, the report shows
+the **URLs** as artifact names, and `--snapshot-dir` persists exactly what was
+fetched so the analysis is reproducible: fetching is I/O, the analysis over
+those bytes is deterministic. Each request has a hard **`--timeout`** (default
+10 s) so dead or stalling hosts — endemic in real phishing feeds — can't hang
+the run; per-URL failures are skipped, never fatal. *(You choose the targets —
+fetching suspected-malicious URLs touches attacker infra from your host; run it
+where that's acceptable.)*
+
+> **JS-rendered forms need a rendered capture.** `wtd web` fetches
+> *server-rendered* HTML. Many modern phishing pages inject the credential
+> `<form>` with JavaScript, so a raw fetch sees the skeleton, branding and
+> resource hosts (enough to cluster the kit) but not the harvested fields. To
+> get those, capture the **rendered DOM** with a headless browser and feed the
+> `.html` to wtd:
+>
+> ```sh
+> # one page, rendered DOM → snapshot
+> chromium --headless --disable-gpu --dump-dom "https://site.example/login" > caps/site.html
+> # …repeat per URL (Playwright's page.content() works too), then:
+> wtd kit ./caps
+> ```
+>
+> Rendering is out of scope for the zero-dependency core; the snapshot workflow
+> keeps that boundary clean while still handling SPAs.
 
 ### `wtd kit` — turn a web family into a signature
 

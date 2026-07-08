@@ -53,6 +53,10 @@ Key facts:
   an external headless capture fed as .html snapshots); URLs become the artifact
   names and `--snapshot-dir <dir>` saves what was fetched so a run is
   reproducible (fetching is I/O, analysis over the bytes is deterministic).
+  Each request has a hard `--timeout <sec>` (default 10) so dead/stalling hosts
+  cannot hang the run. For JS-rendered credential forms, capture the rendered
+  DOM with a headless browser (e.g. `chromium --headless --dump-dom`) and feed
+  the .html to wtd — the zero-dep fetch only sees server-rendered HTML.
   `wtd kit <dir>` emits a kit signature per web family — the harvested form
   fields, form action host, resource hosts, and exclusive skeleton shingles
   (the web analog of `wtd yara`); every atom's witness set equals the member
