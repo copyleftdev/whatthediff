@@ -11,9 +11,10 @@ Key facts:
 - Never compares raw text: files are decomposed into semantic primitives
   (e.g. `db.port=5432`), each hashed with BLAKE3, so key order, whitespace,
   quoting, and comments never register as differences.
-- Cross-format canonical unification: the same fact in JSON, YAML, or INI
-  hashes to the same identity, so mixed-format corpora find real consensus.
-  Lists are index-less (`features[]=x`) — reordering a list is not drift.
+- Cross-format canonical unification: the same fact in JSON, YAML, INI, or
+  XML hashes to the same identity, so mixed-format corpora find real
+  consensus. XML attributes unify with child elements. Lists are index-less
+  (`features[]=x`) — reordering a list is not drift.
 - Consensus buckets: universal (in all N files), majority (2k > N),
   minority (1 < k, 2k ≤ N), unique (k = 1). The consensus core is every
   primitive held by a strict majority.

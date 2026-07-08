@@ -84,7 +84,7 @@
         {
           "@type": "Question",
           "name": "What file formats does WhatTheDiff understand?",
-          "acceptedAnswer": { "@type": "Answer", "text": "JSON (fully parsed), YAML-style configs, INI/env/TOML-style key-value files, Markdown, and any text file as a fallback. Malformed input degrades gracefully to line-based comparison instead of failing." }
+          "acceptedAnswer": { "@type": "Answer", "text": "JSON (fully parsed), YAML-style configs, XML (including attributes, entities and CDATA), INI/env/TOML-style key-value files, Markdown, and any text file as a fallback. Formats unify: the same fact in JSON, YAML, INI, or XML hashes to the same identity, so mixed-format corpora find real consensus. Malformed input degrades gracefully to line-based comparison instead of failing." }
         }
       ]
     }
@@ -636,11 +636,11 @@ copyleftdev/whatthediff/main/install.ps1 | iex</pre>
         </details>
         <details>
           <summary>What formats does it understand?</summary>
-          <p>JSON (fully parsed), YAML-style configs, INI/env/TOML-style key-value files,
-          Markdown, and any text file as a fallback. Formats unify: the same fact in JSON,
-          YAML, or INI hashes to the same identity, so a mixed-format corpus finds real
-          consensus. Malformed input degrades gracefully to line-based comparison instead
-          of failing.</p>
+          <p>JSON (fully parsed), YAML-style configs, XML (attributes, entities, CDATA),
+          INI/env/TOML-style key-value files, Markdown, and any text file as a fallback.
+          Formats unify: the same fact in JSON, YAML, INI, or XML hashes to the same
+          identity — even an XML attribute matches a JSON nested key. Malformed input
+          degrades gracefully to line-based comparison instead of failing.</p>
         </details>
         <details>
           <summary>How does outlier detection work?</summary>
@@ -658,8 +658,8 @@ copyleftdev/whatthediff/main/install.ps1 | iex</pre>
         </details>
         <details>
           <summary>What's on the roadmap?</summary>
-          <p>PDF/XML and source-code extractors.
-          Already shipped: the streaming evidence store (v0.5.0 — one million files in 21.8&nbsp;s
+          <p>PDF and source-code extractors.
+          Already shipped: the XML extractor (v0.6.0 — attributes unify with child elements), the streaming evidence store (v0.5.0 — one million files in 21.8&nbsp;s
           and 3.8&nbsp;GB RSS, detection still exact), <span style="font-family:var(--mono);font-size:.9em">wtd ask</span>
           (v0.2.0, the AI adapter over the evidence graph), cross-format canonical unification
           (v0.3.0 — the same fact in JSON, YAML, or INI hashes to the same identity), and

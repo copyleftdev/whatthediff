@@ -12,6 +12,7 @@ pub const Identity = [32]u8;
 pub const ArtifactKind = enum {
     json,
     yaml,
+    xml,
     markdown,
     config,
     text,

@@ -631,6 +631,78 @@ test "tri-format corpus: JSON, YAML, and INI of the same config fully agree" {
     }
 }
 
+// -------------------------------------------- xml cross-format ------------
+
+const xml_extractor = @import("extractors/xml.zig");
+
+/// Serialize a map-only CfNode tree as XML under a named root element.
+/// (Lists are excluded: XML has no index-less list form — repeated elements
+/// emit repeated paths instead of `[]` segments.)
+fn writeCfXml(node: CfNode, out: *std.ArrayList(u8)) !void {
+    for (node.map) |f| {
+        try out.append('<');
+        try out.appendSlice(f.name);
+        try out.append('>');
+        switch (f.value) {
+            .scalar => |s| try out.appendSlice(s),
+            .map => try writeCfXml(f.value, out),
+            .list => unreachable, // generator is called with lists disabled
+        }
+        try out.appendSlice("</");
+        try out.appendSlice(f.name);
+        try out.append('>');
+    }
+}
+
+fn genCfMapNoLists(arena: std.mem.Allocator, rand: std.Random, depth: usize) !CfNode {
+    const len = rand.intRangeAtMost(usize, 1, 5);
+    const fields = try arena.alloc(CfNode.CfField, len);
+    for (fields, 0..) |*f, i| {
+        f.name = try std.fmt.allocPrint(arena, "k{d}", .{i});
+        if (depth > 0 and rand.float(f64) < 0.35) {
+            f.value = try genCfMapNoLists(arena, rand, depth - 1);
+        } else {
+            f.value = .{ .scalar = try genCfScalar(arena, rand) };
+        }
+    }
+    return .{ .map = fields };
+}
+
+test "property: the same structure in JSON and XML yields identical identities" {
+    var iter: u64 = 0;
+    while (iter < 150) : (iter += 1) {
+        const seed = 0x5eed_0009 + iter;
+        errdefer std.debug.print("\ncounterexample: xml cross-format property, seed=0x{x}\n", .{seed});
+
+        var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena_state.deinit();
+        const arena = arena_state.allocator();
+        var prng = std.Random.DefaultPrng.init(seed);
+        const rand = prng.random();
+
+        const doc = try genCfMapNoLists(arena, rand, 3);
+
+        // XML needs a named root; give JSON the same root key.
+        var xml_text = std.ArrayList(u8).init(arena);
+        try xml_text.appendSlice("<root>");
+        try writeCfXml(doc, &xml_text);
+        try xml_text.appendSlice("</root>");
+
+        var json_text = std.ArrayList(u8).init(arena);
+        try json_text.appendSlice("{\"root\":");
+        try writeCfJson(doc, &json_text);
+        try json_text.appendSlice("}");
+
+        const from_xml = try xml_extractor.extract(arena, xml_text.items);
+        const from_json = try json_extractor.extract(arena, json_text.items);
+
+        const cx = try sortedCanonicals(arena, from_xml);
+        const cj = try sortedCanonicals(arena, from_json);
+        try std.testing.expectEqual(cj.len, cx.len);
+        for (cj, cx) |a, b| try std.testing.expectEqualStrings(a, b);
+    }
+}
+
 // ------------------------------------------------- faction recovery -------
 
 const cluster = @import("cluster.zig");

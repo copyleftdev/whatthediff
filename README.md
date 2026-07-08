@@ -5,8 +5,8 @@
 **Traditional diff tools answer *"what changed?"* — WTD answers *"what actually matters?"***
 
 [![Zig](https://img.shields.io/badge/Zig-0.14-f7a41d?logo=zig&logoColor=white)](https://ziglang.org)
-[![Tests](https://img.shields.io/badge/tests-47%2F47-brightgreen)](#-testing)
-[![Property iterations](https://img.shields.io/badge/property_iterations-815-brightgreen)](#-testing)
+[![Tests](https://img.shields.io/badge/tests-54%2F54-brightgreen)](#-testing)
+[![Property iterations](https://img.shields.io/badge/property_iterations-965-brightgreen)](#-testing)
 [![Scale](https://img.shields.io/badge/1M_files-22µs%2Ffile-blue)](#-scale)
 [![Deterministic](https://img.shields.io/badge/reports-byte--identical-8A2BE2)](#-testing)
 [![Dependencies](https://img.shields.io/badge/dependencies-0-lightgrey)](#-architecture)
@@ -63,18 +63,20 @@ artifacts → normalization → primitive extraction → canonical form
 Artifacts are never compared as raw text. Each is decomposed into
 **primitives** — stable semantic facts:
 
-| kind        | source                           | canonical form                 |
-|-------------|----------------------------------|--------------------------------|
-| `kv`        | JSON (parsed), YAML-lite, config | `db.port=5432`, `features[]=x` |
+| kind        | source                                | canonical form                 |
+|-------------|---------------------------------------|--------------------------------|
+| `kv`        | JSON, YAML-lite, XML-lite, config     | `db.port=5432`, `features[]=x` |
 | `heading`   | Markdown                         | `h2:Deployment`                |
 | `line`      | text fallback                    | trimmed line                   |
 
 Each primitive's identity is `BLAKE3(kind ‖ 0x00 ‖ canonical)`.
 **The canonical form is cross-format**: `{"db":{"port":5432}}` in JSON,
-`db:\n  port: 5432` in YAML, and `[db]\nport = 5432` in INI all hash to the
-same identity — a mixed-format corpus finds real consensus instead of
-splitting into format factions. Lists are index-less (`features[]=x`), so
-reordering a list is not drift. Every identity keeps its full occurrence
+`db:\n  port: 5432` in YAML, `[db]\nport = 5432` in INI, and
+`<db port="5432"/>` in XML all hash to the same identity — a mixed-format
+corpus finds real consensus instead of splitting into format factions. XML
+attributes unify with child elements (attribute-vs-element is syntax, not
+meaning). Lists are index-less (`features[]=x`), so reordering a list is
+not drift. Every identity keeps its full occurrence
 list (artifact + line): nothing is claimed without inspectable evidence.
 
 With N artifacts and a primitive present in k of them:
@@ -239,7 +241,9 @@ Each module is independently testable and replaceable; extractors degrade
 - [x] Streaming evidence store for millions of artifacts (v0.5.0: per-artifact
   scratch arena + one-copy canonicals + u32 index sets; 1M files in 21.8 s /
   3.8 GB RSS, detection still exact)
-- [ ] PDF, XML, and source-code extractors
+- [x] XML extractor (v0.6.0: XML-lite with entities/CDATA/DOCTYPE; attributes
+  unify with child elements; property-tested against JSON on random structures)
+- [ ] PDF and source-code extractors
 
 ## 📜 Design notes
 

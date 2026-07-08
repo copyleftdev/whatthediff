@@ -6,6 +6,7 @@ const std = @import("std");
 const types = @import("types.zig");
 const json = @import("extractors/json.zig");
 const yamlish = @import("extractors/yamlish.zig");
+const xml = @import("extractors/xml.zig");
 const config = @import("extractors/config.zig");
 const markdown = @import("extractors/markdown.zig");
 const text = @import("extractors/text.zig");
@@ -21,13 +22,22 @@ pub fn extract(
             else => |e| e,
         },
         .yaml => yamlish.extract(arena, content),
+        .xml => xml.extract(arena, content) catch |err| switch (err) {
+            error.Unparseable => text.extract(arena, content),
+            else => |e| e,
+        },
         .config => config.extract(arena, content),
         .markdown => markdown.extract(arena, content),
         .text => blk: {
-            // Extension lied? Sniff JSON payloads in .txt/unknown files.
+            // Extension lied? Sniff JSON and XML payloads in .txt/unknown files.
             const lead = std.mem.trimLeft(u8, content, " \t\r\n");
             if (lead.len > 0 and (lead[0] == '{' or lead[0] == '[')) {
                 if (json.extract(arena, content)) |prims| {
+                    break :blk prims;
+                } else |_| {}
+            }
+            if (lead.len > 0 and lead[0] == '<') {
+                if (xml.extract(arena, content)) |prims| {
                     break :blk prims;
                 } else |_| {}
             }
