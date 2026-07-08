@@ -231,7 +231,7 @@ pub fn renderJson(
     }
 
     const report = JsonReport{
-        .schema = "wtd.report.v0",
+        .schema = "wtd.report.v1",
         .corpus = .{
             .artifacts = a.n_artifacts,
             .distinct_primitives = a.n_identities,

@@ -63,16 +63,19 @@ artifacts → normalization → primitive extraction → canonical form
 Artifacts are never compared as raw text. Each is decomposed into
 **primitives** — stable semantic facts:
 
-| kind        | source            | canonical form      |
-|-------------|-------------------|---------------------|
-| `json_leaf` | JSON (parsed)     | `$.db.port=5432`    |
-| `kv`        | YAML-lite, config | `db.host=localhost` |
-| `heading`   | Markdown          | `h2:Deployment`     |
-| `line`      | text fallback     | trimmed line        |
+| kind        | source                           | canonical form                 |
+|-------------|----------------------------------|--------------------------------|
+| `kv`        | JSON (parsed), YAML-lite, config | `db.port=5432`, `features[]=x` |
+| `heading`   | Markdown                         | `h2:Deployment`                |
+| `line`      | text fallback                    | trimmed line                   |
 
-Each primitive's identity is `BLAKE3(kind ‖ 0x00 ‖ canonical)`. Every identity
-keeps its full occurrence list (artifact + line): nothing is claimed without
-inspectable evidence.
+Each primitive's identity is `BLAKE3(kind ‖ 0x00 ‖ canonical)`.
+**The canonical form is cross-format**: `{"db":{"port":5432}}` in JSON,
+`db:\n  port: 5432` in YAML, and `[db]\nport = 5432` in INI all hash to the
+same identity — a mixed-format corpus finds real consensus instead of
+splitting into format factions. Lists are index-less (`features[]=x`), so
+reordering a list is not drift. Every identity keeps its full occurrence
+list (artifact + line): nothing is claimed without inspectable evidence.
 
 With N artifacts and a primitive present in k of them:
 
@@ -115,7 +118,7 @@ scripts/release.sh                  # test + package dist/*.tar.gz|zip + SHA256S
 | `wtd <path>...` | full human report |
 | `wtd configs/ --drift` | drift ranking only |
 | `wtd configs/ --consensus` | consensus buckets only |
-| `wtd configs/ --json` | machine-readable evidence graph (`wtd.report.v0`) |
+| `wtd configs/ --json` | machine-readable evidence graph (`wtd.report.v1`) |
 | `wtd configs/ --json --evidence` | uncapped occurrence lists |
 | `wtd ask "<question>" configs/` | AI explains the evidence (see below) |
 
@@ -215,7 +218,8 @@ Each module is independently testable and replaceable; extractors degrade
 
 - [x] `wtd ask "why is contract_17 different?"` — AI adapter explaining the
   evidence graph (v0.2.0: Anthropic / OpenAI-compatible / local endpoints)
-- [ ] Cross-format canonical unification (same fact in JSON and YAML → same identity)
+- [x] Cross-format canonical unification (v0.3.0: same fact in JSON, YAML, or
+  INI → same identity; property-tested with random structures serialized both ways)
 - [ ] Pairwise similarity / clustering — find factions, not just outliers
 - [ ] PDF, XML, and source-code extractors
 - [ ] Streaming evidence store for millions of artifacts

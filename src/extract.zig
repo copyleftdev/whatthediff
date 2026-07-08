@@ -53,6 +53,6 @@ test "json payload in a text file is sniffed" {
 
     const prims = try extract(arena, .text, "  {\"a\": 1}");
     try std.testing.expectEqual(@as(usize, 1), prims.len);
-    try std.testing.expectEqual(types.PrimitiveKind.json_leaf, prims[0].kind);
-    try std.testing.expectEqualStrings("$.a=1", prims[0].canonical);
+    try std.testing.expectEqual(types.PrimitiveKind.kv, prims[0].kind);
+    try std.testing.expectEqualStrings("a=1", prims[0].canonical);
 }

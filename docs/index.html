@@ -445,7 +445,7 @@ Corpus: 5 artifacts · 12 distinct primitives · 34 observations
       <span class="kicker">How it works</span>
       <h2>Files in. Meaning out.</h2>
       <p class="sub">wtd never compares raw text. Every artifact is decomposed into
-      <em>primitives</em> — stable semantic facts like <code style="font-family:var(--mono);font-size:.85em">$.db.port=5432</code> —
+      <em>primitives</em> — stable semantic facts like <code style="font-family:var(--mono);font-size:.85em">db.port=5432</code> —
       each hashed with BLAKE3, so key order, whitespace, quoting and comments never register as difference.</p>
 
       <div class="pipeline" aria-label="Processing pipeline">
@@ -537,7 +537,7 @@ Corpus: 5 artifacts · 12 distinct primitives · 34 observations
           <svg class="icon" viewBox="0 0 15 15" fill="none" aria-hidden="true"><path d="M3.5 2C3.22386 2 3 2.22386 3 2.5V12.5C3 12.7761 3.22386 13 3.5 13H11.5C11.7761 13 12 12.7761 12 12.5V6H8.5C8.22386 6 8 5.77614 8 5.5V2H3.5ZM9 2.70711L11.2929 5H9V2.70711ZM2 2.5C2 1.67157 2.67157 1 3.5 1H8.5C8.63261 1 8.75979 1.05268 8.85355 1.14645L12.8536 5.14645C12.9473 5.24021 13 5.36739 13 5.5V12.5C13 13.3284 12.3284 14 11.5 14H3.5C2.67157 14 2 13.3284 2 12.5V2.5Z" fill="currentColor"/></svg>
           <div>
             <h3>AI-ready evidence graph</h3>
-            <p><code>wtd --json</code> emits the full evidence graph (<code>wtd.report.v0</code>) —
+            <p><code>wtd --json</code> emits the full evidence graph (<code>wtd.report.v1</code>) —
             a stable contract for pipelines, dashboards, or an LLM that explains
             <em>why</em> a file drifted without ever inventing facts.</p>
           </div>
@@ -633,8 +633,10 @@ copyleftdev/whatthediff/main/install.ps1 | iex</pre>
         <details>
           <summary>What formats does it understand?</summary>
           <p>JSON (fully parsed), YAML-style configs, INI/env/TOML-style key-value files,
-          Markdown, and any text file as a fallback. Malformed input degrades gracefully
-          to line-based comparison instead of failing.</p>
+          Markdown, and any text file as a fallback. Formats unify: the same fact in JSON,
+          YAML, or INI hashes to the same identity, so a mixed-format corpus finds real
+          consensus. Malformed input degrades gracefully to line-based comparison instead
+          of failing.</p>
         </details>
         <details>
           <summary>How does outlier detection work?</summary>
@@ -652,11 +654,12 @@ copyleftdev/whatthediff/main/install.ps1 | iex</pre>
         </details>
         <details>
           <summary>What's on the roadmap?</summary>
-          <p>Cross-format canonical unification (same fact in JSON and YAML → same identity),
-          pairwise clustering to find factions, PDF/XML extractors, and a streaming evidence
-          store for millions of artifacts.
-          (<span style="font-family:var(--mono);font-size:.9em">wtd ask</span> — the AI adapter
-          over the evidence graph — shipped in v0.2.0.)</p>
+          <p>Pairwise clustering to find factions, PDF/XML extractors, and a streaming evidence
+          store for millions of artifacts. Already shipped:
+          <span style="font-family:var(--mono);font-size:.9em">wtd ask</span> (v0.2.0, the AI
+          adapter over the evidence graph) and cross-format canonical unification (v0.3.0 —
+          the same fact in JSON, YAML, or INI hashes to the same identity, so mixed-format
+          corpora find real consensus).</p>
         </details>
       </div>
     </div>

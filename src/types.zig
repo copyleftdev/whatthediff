@@ -26,9 +26,10 @@ pub const Artifact = struct {
 };
 
 pub const PrimitiveKind = enum {
-    /// A JSON leaf: `$.path[0].to.leaf=<canonical scalar>`.
-    json_leaf,
-    /// A key/value fact from config or YAML-like sources: `section.key=value`.
+    /// A key/value fact in the cross-format canonical form `db.port=5432`
+    /// (list items `features[]=x`, scalars unquoted). JSON, YAML-lite, and
+    /// config extractors all emit this kind, so the same fact in any of
+    /// those formats hashes to the same identity.
     kv,
     /// A Markdown heading: `h2:Title`.
     heading,

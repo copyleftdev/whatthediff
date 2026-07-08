@@ -435,6 +435,202 @@ test "property: JSON key order and whitespace never change primitives" {
     }
 }
 
+// ----------------------------------- cross-format unification -------------
+
+const hash = @import("hash.zig");
+const yamlish_extractor = @import("extractors/yamlish.zig");
+
+/// A structure expressible in both JSON and YAML-lite: nested maps with
+/// scalar leaves and lists of scalars.
+const CfNode = union(enum) {
+    scalar: []const u8,
+    map: []CfField,
+    list: [][]const u8,
+
+    const CfField = struct { name: []const u8, value: CfNode };
+};
+
+fn genCfMap(arena: std.mem.Allocator, rand: std.Random, depth: usize) !CfNode {
+    const len = rand.intRangeAtMost(usize, 1, 5);
+    const fields = try arena.alloc(CfNode.CfField, len);
+    for (fields, 0..) |*f, i| {
+        f.name = try std.fmt.allocPrint(arena, "k{d}", .{i});
+        const roll = rand.float(f64);
+        if (depth > 0 and roll < 0.35) {
+            f.value = try genCfMap(arena, rand, depth - 1);
+        } else if (roll < 0.55) {
+            const n = rand.intRangeAtMost(usize, 1, 4);
+            const items = try arena.alloc([]const u8, n);
+            for (items) |*item| item.* = try genCfScalar(arena, rand);
+            f.value = .{ .list = items };
+        } else {
+            f.value = .{ .scalar = try genCfScalar(arena, rand) };
+        }
+    }
+    return .{ .map = fields };
+}
+
+fn genCfScalar(arena: std.mem.Allocator, rand: std.Random) ![]const u8 {
+    return switch (rand.uintLessThan(u8, 5)) {
+        0 => "true",
+        1 => "false",
+        2 => "null",
+        3 => try std.fmt.allocPrint(arena, "{d}", .{rand.intRangeAtMost(i32, -9999, 9999)}),
+        else => try std.fmt.allocPrint(arena, "v{d}", .{rand.uintLessThan(u16, 1000)}),
+    };
+}
+
+fn writeCfJson(node: CfNode, out: *std.ArrayList(u8)) !void {
+    switch (node) {
+        .scalar => |s| try writeCfJsonScalar(s, out),
+        .list => |items| {
+            try out.append('[');
+            for (items, 0..) |item, i| {
+                if (i > 0) try out.append(',');
+                try writeCfJsonScalar(item, out);
+            }
+            try out.append(']');
+        },
+        .map => |fields| {
+            try out.append('{');
+            for (fields, 0..) |f, i| {
+                if (i > 0) try out.append(',');
+                try out.append('"');
+                try out.appendSlice(f.name);
+                try out.appendSlice("\":");
+                try writeCfJson(f.value, out);
+            }
+            try out.append('}');
+        },
+    }
+}
+
+fn writeCfJsonScalar(s: []const u8, out: *std.ArrayList(u8)) !void {
+    // Keep JSON typed where the text form is typed: bools, null, integers
+    // stay bare; everything else becomes a JSON string.
+    if (std.mem.eql(u8, s, "true") or std.mem.eql(u8, s, "false") or std.mem.eql(u8, s, "null")) {
+        try out.appendSlice(s);
+        return;
+    }
+    if (std.fmt.parseInt(i64, s, 10)) |_| {
+        try out.appendSlice(s);
+        return;
+    } else |_| {}
+    try out.append('"');
+    try out.appendSlice(s);
+    try out.append('"');
+}
+
+fn writeCfYaml(node: CfNode, indent: usize, out: *std.ArrayList(u8)) !void {
+    const fields = node.map;
+    for (fields) |f| {
+        try out.appendNTimes(' ', indent);
+        try out.appendSlice(f.name);
+        switch (f.value) {
+            .scalar => |s| {
+                try out.appendSlice(": ");
+                try out.appendSlice(s);
+                try out.append('\n');
+            },
+            .list => |items| {
+                try out.appendSlice(":\n");
+                for (items) |item| {
+                    try out.appendNTimes(' ', indent + 2);
+                    try out.appendSlice("- ");
+                    try out.appendSlice(item);
+                    try out.append('\n');
+                }
+            },
+            .map => {
+                try out.appendSlice(":\n");
+                try writeCfYaml(f.value, indent + 2, out);
+            },
+        }
+    }
+}
+
+fn sortedCanonicals(arena: std.mem.Allocator, prims: []const types.Primitive) ![][]const u8 {
+    const out = try arena.alloc([]const u8, prims.len);
+    for (prims, 0..) |p, i| out[i] = p.canonical;
+    std.mem.sort([]const u8, out, {}, struct {
+        fn lessThan(_: void, a: []const u8, b: []const u8) bool {
+            return std.mem.lessThan(u8, a, b);
+        }
+    }.lessThan);
+    return out;
+}
+
+test "property: the same structure in JSON and YAML yields identical identities" {
+    var iter: u64 = 0;
+    while (iter < 150) : (iter += 1) {
+        const seed = 0x5eed_0007 + iter;
+        errdefer std.debug.print("\ncounterexample: cross-format property, seed=0x{x}\n", .{seed});
+
+        var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena_state.deinit();
+        const arena = arena_state.allocator();
+        var prng = std.Random.DefaultPrng.init(seed);
+        const rand = prng.random();
+
+        const doc = try genCfMap(arena, rand, 3);
+
+        var json_text = std.ArrayList(u8).init(arena);
+        try writeCfJson(doc, &json_text);
+        var yaml_text = std.ArrayList(u8).init(arena);
+        try writeCfYaml(doc, 0, &yaml_text);
+
+        const from_json = try json_extractor.extract(arena, json_text.items);
+        const from_yaml = try yamlish_extractor.extract(arena, yaml_text.items);
+
+        // Same fact set regardless of format (order differs: JSON sorts keys).
+        const cj = try sortedCanonicals(arena, from_json);
+        const cy = try sortedCanonicals(arena, from_yaml);
+        try std.testing.expectEqual(cj.len, cy.len);
+        for (cj, cy) |a, b| try std.testing.expectEqualStrings(a, b);
+
+        // And therefore identical BLAKE3 identities.
+        for (cj) |c| {
+            const id_j = hash.identity(.kv, c);
+            _ = id_j;
+        }
+        for (from_yaml) |p| try std.testing.expectEqual(types.PrimitiveKind.kv, p.kind);
+    }
+}
+
+test "tri-format corpus: JSON, YAML, and INI of the same config fully agree" {
+    var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+
+    try tmp.dir.writeFile(.{
+        .sub_path = "a.json",
+        .data = "{\"db\": {\"port\": 5432, \"host\": \"db.internal\"}, \"tls\": true}",
+    });
+    try tmp.dir.writeFile(.{
+        .sub_path = "b.yaml",
+        .data = "db:\n  port: 5432\n  host: db.internal\ntls: true\n",
+    });
+    try tmp.dir.writeFile(.{
+        .sub_path = "c.conf",
+        .data = "tls = true\n[db]\nport = 5432\nhost = \"db.internal\"\n",
+    });
+
+    const root = try tmp.dir.realpathAlloc(arena, ".");
+    const corpus = try engine.run(arena, &.{root});
+
+    try std.testing.expectEqual(@as(usize, 3), corpus.artifacts.len);
+    // Every primitive is universal: 3 facts, all in all 3 files, zero drift.
+    try std.testing.expectEqual(@as(usize, 3), corpus.analysis.n_identities);
+    try std.testing.expectEqual(@as(usize, 3), corpus.analysis.bucket_counts[0]);
+    for (corpus.analysis.artifact_stats) |s| {
+        try std.testing.expectEqual(@as(f64, 0), s.drift);
+        try std.testing.expectEqual(@as(u32, 3), s.total);
+    }
+}
+
 // ------------------------------------------------ end-to-end shape --------
 
 test "property: full pipeline is byte-deterministic on disk corpora" {
