@@ -64,6 +64,76 @@ fn sanitizeCanonical(scratch: std.mem.Allocator, prim: types.Primitive) ![]const
     }
 }
 
+/// An artifact whose content is already in memory (e.g. a fetched web page).
+pub const Source = struct {
+    /// Display name / provenance — a file path or a URL.
+    name: []const u8,
+    content: []const u8,
+    /// Best kind guess; `.text` lets the extractor sniff the payload.
+    kind: types.ArtifactKind,
+};
+
+/// Accumulates artifacts into the evidence store. Shared by the file path
+/// (`runOpts`) and the in-memory path (`runSources`) so both ingest identically.
+const Builder = struct {
+    arena: std.mem.Allocator,
+    store: *evidence.Store,
+    artifacts: *std.ArrayList(types.Artifact),
+    sets: *std.ArrayList([]u32),
+    skipped: *u32,
+    opts: RunOptions,
+
+    fn add(self: Builder, scratch: std.mem.Allocator, name: []const u8, kind_in: types.ArtifactKind, content: []const u8) !void {
+        // Unknown-extension binaries route to content-defined chunking; a file
+        // declared as a text format but actually binary is malformed → skip.
+        var kind = kind_in;
+        if (kind == .text and isBinary(content)) kind = .binary;
+        if (kind != .pdf and kind != .binary and kind != .cbor and isBinary(content)) {
+            self.skipped.* += 1;
+            return;
+        }
+        if (content.len == 0) {
+            self.skipped.* += 1;
+            return;
+        }
+
+        const id: u32 = @intCast(self.artifacts.items.len);
+        const prims = try extract.extract(scratch, kind, content);
+
+        var set = std.ArrayList(u32).init(self.arena);
+        for (prims) |p| {
+            var prim = p;
+            if (self.opts.keys_only) prim.canonical = try sanitizeCanonical(scratch, prim);
+            const r = try self.store.add(id, prim);
+            if (r.first_for_artifact) try set.append(r.index);
+        }
+
+        try self.artifacts.append(.{ .id = id, .path = name, .kind = kind, .size = content.len });
+        try self.sets.append(try set.toOwnedSlice());
+    }
+};
+
+fn finalize(
+    arena: std.mem.Allocator,
+    store: *evidence.Store,
+    artifacts: *std.ArrayList(types.Artifact),
+    sets: *std.ArrayList([]u32),
+    skipped: u32,
+) !Corpus {
+    const result = try analysis.analyze(arena, store, artifacts.items.len, sets.items);
+    const clusters = try cluster.detect(arena, store, &result, sets.items);
+    const conflict_report = try conflicts.detect(arena, store, artifacts.items.len);
+    return .{
+        .artifacts = try artifacts.toOwnedSlice(),
+        .store = store.*,
+        .sets = try sets.toOwnedSlice(),
+        .analysis = result,
+        .clusters = clusters,
+        .conflicts = conflict_report,
+        .skipped = skipped,
+    };
+}
+
 pub fn runOpts(arena: std.mem.Allocator, paths: []const []const u8, opts: RunOptions) !Corpus {
     const files = try discovery.discover(arena, paths);
 
@@ -71,72 +141,45 @@ pub fn runOpts(arena: std.mem.Allocator, paths: []const []const u8, opts: RunOpt
     var sets = std.ArrayList([]u32).init(arena);
     var store = evidence.Store.init(arena);
     var skipped: u32 = 0;
+    const builder = Builder{ .arena = arena, .store = &store, .artifacts = &artifacts, .sets = &sets, .skipped = &skipped, .opts = opts };
 
-    // Streaming property: file contents, parse trees, and canonical scratch
-    // live in a per-artifact arena that is reset after every file. Only the
-    // store (one canonical copy per distinct fact), the u32 index sets, and
-    // artifact metadata survive — resident memory scales with distinct
-    // facts, not corpus bytes.
+    // Streaming: file contents and parse trees live in a per-artifact arena
+    // reset after every file; only the store, index sets, and metadata survive,
+    // so resident memory scales with distinct facts, not corpus bytes.
     var scratch_state = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer scratch_state.deinit();
 
     for (files) |f| {
         _ = scratch_state.reset(.retain_capacity);
         const scratch = scratch_state.allocator();
-
         const content = std.fs.cwd().readFileAlloc(scratch, f.path, max_artifact_bytes) catch {
             skipped += 1;
             continue;
         };
-        // Binaries are no longer skipped: an unknown-extension file that
-        // sniffs as binary is analyzed with content-defined chunking
-        // (SSDeep/CTPH-style). PDFs and declared binaries route directly.
-        var kind = f.kind;
-        if (kind == .text and isBinary(content)) kind = .binary;
-        // A file *declared* as a text format but actually binary is
-        // malformed input — skip it rather than chunk it.
-        if (kind != .pdf and kind != .binary and kind != .cbor and isBinary(content)) {
-            skipped += 1;
-            continue;
-        }
-        if (content.len == 0) {
-            skipped += 1;
-            continue;
-        }
-
-        const id: u32 = @intCast(artifacts.items.len);
-        const prims = try extract.extract(scratch, kind, content);
-
-        var set = std.ArrayList(u32).init(arena);
-        for (prims) |p| {
-            var prim = p;
-            if (opts.keys_only) prim.canonical = try sanitizeCanonical(scratch, prim);
-            const r = try store.add(id, prim);
-            if (r.first_for_artifact) try set.append(r.index);
-        }
-
-        try artifacts.append(.{
-            .id = id,
-            .path = f.path,
-            .kind = kind,
-            .size = content.len,
-        });
-        try sets.append(try set.toOwnedSlice());
+        try builder.add(scratch, f.path, f.kind, content);
     }
 
-    const result = try analysis.analyze(arena, &store, artifacts.items.len, sets.items);
-    const clusters = try cluster.detect(arena, &store, &result, sets.items);
-    const conflict_report = try conflicts.detect(arena, &store, artifacts.items.len);
+    return finalize(arena, &store, &artifacts, &sets, skipped);
+}
 
-    return .{
-        .artifacts = try artifacts.toOwnedSlice(),
-        .store = store,
-        .sets = try sets.toOwnedSlice(),
-        .analysis = result,
-        .clusters = clusters,
-        .conflicts = conflict_report,
-        .skipped = skipped,
-    };
+/// Analyze artifacts already in memory (fetched web pages, piped content).
+/// Same ingestion and analysis as `runOpts`; only the source of bytes differs.
+pub fn runSources(arena: std.mem.Allocator, sources: []const Source, opts: RunOptions) !Corpus {
+    var artifacts = std.ArrayList(types.Artifact).init(arena);
+    var sets = std.ArrayList([]u32).init(arena);
+    var store = evidence.Store.init(arena);
+    var skipped: u32 = 0;
+    const builder = Builder{ .arena = arena, .store = &store, .artifacts = &artifacts, .sets = &sets, .skipped = &skipped, .opts = opts };
+
+    var scratch_state = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer scratch_state.deinit();
+
+    for (sources) |s| {
+        _ = scratch_state.reset(.retain_capacity);
+        try builder.add(scratch_state.allocator(), s.name, s.kind, s.content);
+    }
+
+    return finalize(arena, &store, &artifacts, &sets, skipped);
 }
 
 fn isBinary(content: []const u8) bool {

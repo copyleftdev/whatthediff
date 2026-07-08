@@ -48,7 +48,11 @@ Key facts:
   harvests (email/password/otp) and where it posts. Normalization drops hashed
   class names, session tokens, inline styles and injected ads; repeated siblings
   collapse to a bag; reformatting never changes a primitive (property-tested).
-  Anchored on phishing-kit / clone detection. `wtd web <url>` fetching planned.
+  Anchored on phishing-kit / clone detection. `wtd web <url>...` fetches pages
+  itself over a zero-dependency std.http client (server-rendered HTML; SPAs need
+  an external headless capture fed as .html snapshots); URLs become the artifact
+  names and `--snapshot-dir <dir>` saves what was fetched so a run is
+  reproducible (fetching is I/O, analysis over the bytes is deterministic).
 - Candidate YARA rules (`wtd yara <dir>`): turns each detected binary family
   into a detection rule. For every faction it computes the discriminative core —
   features present in every member and absent from every other sample in the

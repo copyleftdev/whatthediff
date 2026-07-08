@@ -4,9 +4,9 @@
 
 **Traditional diff tools answer *"what changed?"* — WTD answers *"what actually matters?"***
 
-[![Version](https://img.shields.io/badge/version-1.7.0-0090ff)](https://github.com/copyleftdev/whatthediff/releases/latest)
+[![Version](https://img.shields.io/badge/version-1.8.0-0090ff)](https://github.com/copyleftdev/whatthediff/releases/latest)
 [![Zig](https://img.shields.io/badge/Zig-0.14-f7a41d?logo=zig&logoColor=white)](https://ziglang.org)
-[![Tests](https://img.shields.io/badge/tests-101%2F101-brightgreen)](#-testing)
+[![Tests](https://img.shields.io/badge/tests-103%2F103-brightgreen)](#-testing)
 [![Property iterations](https://img.shields.io/badge/property_iterations-1915-brightgreen)](#-testing)
 [![Scale](https://img.shields.io/badge/1M_files-22µs%2Ffile-blue)](#-scale)
 [![Deterministic](https://img.shields.io/badge/reports-byte--identical-8A2BE2)](#-testing)
@@ -117,7 +117,7 @@ curl -fsSL https://raw.githubusercontent.com/copyleftdev/whatthediff/main/instal
 irm https://raw.githubusercontent.com/copyleftdev/whatthediff/main/install.ps1 | iex
 ```
 
-Pin a version with `WTD_VERSION=v1.7.0`, choose a directory with
+Pin a version with `WTD_VERSION=v1.8.0`, choose a directory with
 `WTD_INSTALL_DIR`. Or grab a binary yourself from
 [Releases](../../releases) — static, zero-install, for Linux
 (x86_64/aarch64, fully static musl), macOS (Intel/Apple Silicon), and
@@ -144,6 +144,7 @@ scripts/release.sh                  # test + package dist/*.tar.gz|zip + SHA256S
 | `wtd ask "<question>" configs/` | AI explains the evidence (see below) |
 | `wtd yara ./samples` | candidate YARA rule per detected binary family |
 | `wtd ./pages --factions` | cluster captured web pages — find the shared phishing kit |
+| `wtd web <url>… --snapshot-dir d` | fetch pages and cluster them; save reproducible snapshots |
 
 > **Secret-safe schema comparison.** `--keys-only` drops the value from every
 > `key=value` primitive (`db.port=5432` → `db.port`) and hashes structureless
@@ -337,8 +338,23 @@ tokens, inline styles and injected ads are dropped, repeated siblings collapse
 to a bag, and the tag-stream is w-shingled so an injected element only disturbs
 local windows (property-tested: reformatting never changes a primitive). A kit
 shows up as a *faction* when it's a minority among diverse pages — exactly how
-you'd scan a suspect set. Feed pre-captured DOM snapshots today (`.html` files);
-`wtd web <url>…` fetching lands next.
+you'd scan a suspect set.
+
+Point it at **saved `.html` snapshots**, or let wtd **fetch** the pages itself:
+
+```console
+$ wtd web https://a.example/login https://b.example/signin … --snapshot-dir ./caps --factions
+wtd: fetched 8/8 URLs
+  faction of 6 · cohesion 0.94   # one kit across six domains
+```
+
+`wtd web` retrieves raw HTML over a zero-dep `std.http` client (server-rendered
+pages — JS-heavy SPAs need an external headless capture fed as snapshots), the
+report shows the **URLs** as artifact names, and `--snapshot-dir` persists
+exactly what was fetched so the analysis is reproducible: fetching is I/O, the
+analysis over those bytes is deterministic. Per-URL failures are skipped, never
+fatal. *(You choose the targets — fetching suspected-malicious URLs touches
+attacker infra from your host; run it where that's acceptable.)*
 
 ### `wtd yara` — turn a family into a detection rule
 
@@ -497,8 +513,10 @@ original spec (SSDeep-class binary analysis, secret-safe schema comparison).
 - [x] HTML/DOM extractor for web-page clustering (v1.7.0: structural shingles,
   form fields, resource hosts → phishing-kit / clone detection over captured
   pages; formatting-invariance property-tested)
+- [x] `wtd web <url>…` fetching (v1.8.0: zero-dep std.http GET + `--snapshot-dir`
+  reproducible capture; URLs become artifact names, per-URL failures skipped)
 
-*Next:* `wtd web <url>…` fetching + DOM signatures. *Still ideas:* semantic
+*Next:* DOM/kit signatures (`wtd yara`-style, for web). *Still ideas:* semantic
 source-code extractors, pairwise similarity matrix export, a `wtd triage` recipe.
 
 ## 📜 Design notes

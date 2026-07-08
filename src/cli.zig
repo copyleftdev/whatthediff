@@ -8,8 +8,9 @@ const ask = @import("ask.zig");
 const gate = @import("gate.zig");
 const yara = @import("yara.zig");
 const binary = @import("extractors/binary.zig");
+const fetch = @import("fetch.zig");
 
-pub const version = "1.7.0";
+pub const version = "1.8.0";
 
 const usage =
     \\wtd — WhatTheDiff: what actually matters across N artifacts
@@ -18,6 +19,8 @@ const usage =
     \\  wtd <path>... [options]
     \\  wtd ask "<question>" [path...] [options]
     \\  wtd yara <path>...   Emit candidate YARA rules for detected binary families
+    \\  wtd web <url>...     Fetch pages and cluster them (phishing-kit / clone detection);
+    \\                       [--snapshot-dir <dir>] saves what was fetched (reproducible)
     \\
     \\Options:
     \\  --json        Machine-readable report (full evidence graph)
@@ -61,6 +64,9 @@ pub fn run(arena: std.mem.Allocator, args: []const []const u8) !u8 {
     }
     if (args.len > 0 and std.mem.eql(u8, args[0], "yara")) {
         return runYara(arena, args[1..]);
+    }
+    if (args.len > 0 and std.mem.eql(u8, args[0], "web")) {
+        return runWeb(arena, args[1..]);
     }
 
     var paths = std.ArrayList([]const u8).init(arena);
@@ -170,6 +176,94 @@ pub fn run(arena: std.mem.Allocator, args: []const []const u8) !u8 {
         }
         if (g.failed) return gate.exit_code;
     }
+    return 0;
+}
+
+fn runWeb(arena: std.mem.Allocator, args: []const []const u8) !u8 {
+    const stderr = std.io.getStdErr().writer();
+    var urls = std.ArrayList([]const u8).init(arena);
+    var opts = render.Options{};
+    var as_json = false;
+    var snapshot_dir: ?[]const u8 = null;
+    const sd_prefix = "--snapshot-dir=";
+
+    var i: usize = 0;
+    while (i < args.len) : (i += 1) {
+        const arg = args[i];
+        if (std.mem.eql(u8, arg, "--help") or std.mem.eql(u8, arg, "-h")) {
+            try std.io.getStdOut().writer().writeAll(usage);
+            return 0;
+        } else if (std.mem.eql(u8, arg, "--json")) {
+            as_json = true;
+        } else if (std.mem.eql(u8, arg, "--consensus")) {
+            opts.section = .consensus;
+        } else if (std.mem.eql(u8, arg, "--drift")) {
+            opts.section = .drift;
+        } else if (std.mem.eql(u8, arg, "--conflicts")) {
+            opts.section = .conflicts;
+        } else if (std.mem.eql(u8, arg, "--factions")) {
+            opts.section = .factions;
+        } else if (std.mem.eql(u8, arg, "--snapshot-dir")) {
+            i += 1;
+            if (i >= args.len) {
+                try stderr.writeAll("wtd: --snapshot-dir requires a directory\n");
+                return 2;
+            }
+            snapshot_dir = args[i];
+        } else if (std.mem.startsWith(u8, arg, sd_prefix)) {
+            snapshot_dir = arg[sd_prefix.len..];
+        } else if (std.mem.startsWith(u8, arg, "-")) {
+            try stderr.print("wtd: unknown web option '{s}'\n", .{arg});
+            return 2;
+        } else {
+            try urls.append(arg);
+        }
+    }
+
+    if (urls.items.len == 0) {
+        try stderr.writeAll("wtd web needs at least one URL (http:// or https://)\n");
+        return 2;
+    }
+    if (snapshot_dir) |d| std.fs.cwd().makePath(d) catch {};
+
+    // Fetch is nondeterministic I/O; a per-URL failure is skipped, never fatal.
+    var sources = std.ArrayList(engine.Source).init(arena);
+    for (urls.items) |url| {
+        if (!fetch.isHttpUrl(url)) {
+            try stderr.print("wtd: skipping non-http url '{s}'\n", .{url});
+            continue;
+        }
+        const resp = fetch.get(arena, url) catch |err| {
+            try stderr.print("wtd: fetch failed for {s}: {s}\n", .{ url, @errorName(err) });
+            continue;
+        };
+        if (snapshot_dir) |d| {
+            const name = try fetch.snapshotName(arena, url);
+            const path = try std.fs.path.join(arena, &.{ d, name });
+            std.fs.cwd().writeFile(.{ .sub_path = path, .data = resp.body }) catch |err| {
+                try stderr.print("wtd: could not save snapshot {s}: {s}\n", .{ path, @errorName(err) });
+            };
+        }
+        // .text lets the extractor sniff — HTML routes to the DOM extractor.
+        try sources.append(.{ .name = url, .content = resp.body, .kind = .text });
+    }
+
+    if (sources.items.len == 0) {
+        try stderr.writeAll("wtd: no pages fetched\n");
+        return 1;
+    }
+    try stderr.print("wtd: fetched {d}/{d} URLs\n", .{ sources.items.len, urls.items.len });
+
+    const corpus = try engine.runSources(arena, sources.items, .{});
+
+    var buffered = std.io.bufferedWriter(std.io.getStdOut().writer());
+    const writer = buffered.writer();
+    if (as_json) {
+        try render.renderJson(arena, writer, &corpus, opts);
+    } else {
+        try render.renderText(writer, &corpus, opts);
+    }
+    try buffered.flush();
     return 0;
 }
 

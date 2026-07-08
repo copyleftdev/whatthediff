@@ -39,6 +39,7 @@ test {
     _ = @import("conflicts.zig");
     _ = @import("gate.zig");
     _ = @import("yara.zig");
+    _ = @import("fetch.zig");
     _ = @import("ai.zig");
     _ = @import("ask.zig");
 }
