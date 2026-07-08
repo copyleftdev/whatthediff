@@ -165,39 +165,39 @@ fn writeFocus(
         stat.in_core, stat.unique, if (stat.outlier) ", OUTLIER" else "",
     });
 
-    // Membership set for this artifact.
-    var member = std.AutoHashMap(types.Identity, void).init(arena);
-    for (corpus.sets[fid]) |id| try member.put(id, {});
+    // Membership bitset for this artifact (sets hold dense store indexes).
+    var member = try std.DynamicBitSet.initEmpty(arena, corpus.store.count());
+    for (corpus.sets[fid]) |idx| member.set(idx);
 
     // Unique primitives (present only in this artifact), with line numbers.
     var shown: usize = 0;
-    for (a.identity_stats) |stat_i| {
-        if (stat_i.bucket != .unique) continue;
-        const obs = corpus.store.get(stat_i.identity).?;
+    for (0..corpus.store.count()) |i| {
+        const obs = corpus.store.at(i);
+        if (obs.distinct_artifacts != 1 or a.n_artifacts < 2) continue;
         const occ = obs.occurrences.items[0];
         if (occ.artifact != fid) continue;
         if (shown == 0) try w.print("  unique to this file:\n", .{});
         shown += 1;
         if (shown > max_unique_per_focus) continue;
         if (occ.line > 0) {
-            try w.print("    {s} {s} (line {d})\n", .{ @tagName(stat_i.kind), clip(stat_i.canonical), occ.line });
+            try w.print("    {s} {s} (line {d})\n", .{ @tagName(obs.kind), clip(obs.canonical), occ.line });
         } else {
-            try w.print("    {s} {s}\n", .{ @tagName(stat_i.kind), clip(stat_i.canonical) });
+            try w.print("    {s} {s}\n", .{ @tagName(obs.kind), clip(obs.canonical) });
         }
     }
     if (shown > max_unique_per_focus) try w.print("    ... {d} more unique primitives omitted\n", .{shown - max_unique_per_focus});
 
     // Consensus-core primitives this artifact is missing.
     var missing: usize = 0;
-    for (a.identity_stats) |stat_i| {
-        const in_core = stat_i.bucket == .universal or stat_i.bucket == .majority;
-        if (!in_core) continue;
-        if (member.contains(stat_i.identity)) continue;
+    for (0..corpus.store.count()) |i| {
+        const obs = corpus.store.at(i);
+        if (2 * @as(usize, obs.distinct_artifacts) <= a.n_artifacts) continue;
+        if (member.isSet(i)) continue;
         if (missing == 0) try w.print("  in the consensus core but MISSING from this file:\n", .{});
         missing += 1;
         if (missing > max_missing_per_focus) continue;
         try w.print("    {s} {s} (in {d}/{d} files)\n", .{
-            @tagName(stat_i.kind), clip(stat_i.canonical), stat_i.artifacts, a.n_artifacts,
+            @tagName(obs.kind), clip(obs.canonical), obs.distinct_artifacts, a.n_artifacts,
         });
     }
     if (missing > max_missing_per_focus) try w.print("    ... {d} more missing core primitives omitted\n", .{missing - max_missing_per_focus});
@@ -319,7 +319,7 @@ const evidence_mod = @import("evidence.zig");
 fn testCorpus(arena: std.mem.Allocator) !engine.Corpus {
     // 3 conformers + 1 rogue, built directly (no fs).
     var store = evidence_mod.Store.init(arena);
-    var sets = std.ArrayList([]types.Identity).init(arena);
+    var sets = std.ArrayList([]u32).init(arena);
     var artifacts = std.ArrayList(types.Artifact).init(arena);
 
     const shared = [_][]const u8{ "host=db", "port=5432", "tls=true" };
@@ -327,15 +327,15 @@ fn testCorpus(arena: std.mem.Allocator) !engine.Corpus {
 
     const names = [_][]const u8{ "configs/a.yaml", "configs/b.yaml", "configs/c.yaml", "configs/rogue.yaml" };
     for (names, 0..) |name, aid| {
-        var set = std.ArrayList(types.Identity).init(arena);
+        var set = std.ArrayList(u32).init(arena);
         const prims: []const []const u8 = if (aid == 3) &rogue else &shared;
         for (prims, 0..) |c, line| {
-            const r = try store.add(arena, @intCast(aid), .{
+            const r = try store.add(@intCast(aid), .{
                 .kind = .kv,
                 .canonical = c,
                 .line = @intCast(line + 1),
             });
-            if (r.first_for_artifact) try set.append(r.identity);
+            if (r.first_for_artifact) try set.append(r.index);
         }
         try artifacts.append(.{ .id = @intCast(aid), .path = name, .kind = .yaml, .size = 100 });
         try sets.append(try set.toOwnedSlice());

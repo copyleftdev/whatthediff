@@ -5,9 +5,9 @@
 **Traditional diff tools answer *"what changed?"* — WTD answers *"what actually matters?"***
 
 [![Zig](https://img.shields.io/badge/Zig-0.14-f7a41d?logo=zig&logoColor=white)](https://ziglang.org)
-[![Tests](https://img.shields.io/badge/tests-29%2F29-brightgreen)](#-testing)
-[![Property iterations](https://img.shields.io/badge/property_iterations-565-brightgreen)](#-testing)
-[![Scale](https://img.shields.io/badge/200k_files-23µs%2Ffile-blue)](#-scale)
+[![Tests](https://img.shields.io/badge/tests-47%2F47-brightgreen)](#-testing)
+[![Property iterations](https://img.shields.io/badge/property_iterations-815-brightgreen)](#-testing)
+[![Scale](https://img.shields.io/badge/1M_files-22µs%2Ffile-blue)](#-scale)
 [![Deterministic](https://img.shields.io/badge/reports-byte--identical-8A2BE2)](#-testing)
 [![Dependencies](https://img.shields.io/badge/dependencies-0-lightgrey)](#-architecture)
 [![Platforms](https://img.shields.io/badge/platforms-Linux%20·%20macOS%20·%20Windows-informational)](#-quick-start)
@@ -107,7 +107,7 @@ curl -fsSL https://raw.githubusercontent.com/copyleftdev/whatthediff/main/instal
 irm https://raw.githubusercontent.com/copyleftdev/whatthediff/main/install.ps1 | iex
 ```
 
-Pin a version with `WTD_VERSION=v0.1.0`, choose a directory with
+Pin a version with `WTD_VERSION=v0.5.0`, choose a directory with
 `WTD_INSTALL_DIR`. Or grab a binary yourself from
 [Releases](../../releases) — static, zero-install, for Linux
 (x86_64/aarch64, fully static musl), macOS (Intel/Apple Silicon), and
@@ -180,20 +180,25 @@ planted set** at every size.
 
 ## 📈 Scale
 
-Measured 2026-07-07, ReleaseFast, tmpfs:
+Measured 2026-07-07, ReleaseFast (v0.5.0 streaming store):
 
 | files | planted rogues | wall | per file | RSS | verdict |
 |---:|---:|---:|---:|---:|:---:|
-| 1,000 | 20 | 0.02 s | 20 µs | 9.5 MB | ✅ exact |
-| 10,000 | 200 | 0.22 s | 22 µs | 93 MB | ✅ exact |
-| 50,000 | 1,000 | 1.14 s | 23 µs | 478 MB | ✅ exact |
-| 200,000 | 4,000 | 4.63 s | 23 µs | 1.9 GB | ✅ exact |
+| 1,000 | 20 | 0.02 s | 20 µs | 4 MB | ✅ exact |
+| 10,000 | 200 | 0.18 s | 18 µs | 37 MB | ✅ exact |
+| 50,000 | 1,000 | 0.93 s | 19 µs | 186 MB | ✅ exact |
+| 200,000 | 4,000 | 3.88 s | 19 µs | 754 MB | ✅ exact |
+| **1,000,000** | **20,000** | **21.8 s** | **22 µs** | **3.8 GB** | ✅ exact |
 
 Per-file cost is **flat** — time scales linearly, zero false positives at
-every size. Memory (~9.6 KB/artifact resident, ~3× for JSON parse trees) is
-the current ceiling: 2M artifacts extrapolates to ~46 s CPU but ~19 GB RSS,
-which is why the streaming evidence store is on the roadmap. Oversized
-(>64 MiB) artifacts are skipped cleanly, never fatal.
+every size (at 1M files: 2.56M distinct primitives, 41.8M observations, all
+20,000 planted rogues flagged with zero false positives). The streaming
+evidence store keeps file contents and parse trees in a per-artifact arena
+that's reset after each file, so **resident memory scales with distinct
+facts, not corpus bytes** — engine-only RSS at 1M files is 3.35 GB
+(~3.3 KB/artifact for this corpus profile); `--json` adds the materialized
+report on top. Oversized (>64 MiB) artifacts are skipped cleanly, never
+fatal.
 
 ```sh
 scripts/bench.sh                  # 100 → 50k files, yaml
@@ -231,8 +236,10 @@ Each module is independently testable and replaceable; extractors degrade
 - [x] Pairwise similarity / clustering — find factions, not just outliers
   (v0.4.0: minority-set Jaccard + union-find, faction signatures, property-tested
   exact recovery of planted factions)
+- [x] Streaming evidence store for millions of artifacts (v0.5.0: per-artifact
+  scratch arena + one-copy canonicals + u32 index sets; 1M files in 21.8 s /
+  3.8 GB RSS, detection still exact)
 - [ ] PDF, XML, and source-code extractors
-- [ ] Streaming evidence store for millions of artifacts
 
 ## 📜 Design notes
 

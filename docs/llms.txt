@@ -24,9 +24,11 @@ Key facts:
   faction reports its signature — the shared deviations that define it
   (e.g. "region=eu, 3/3 members"). `wtd <dir> --factions` shows just this.
 - Fully deterministic engine — no AI, no randomness; byte-identical reports.
-  Property-tested (seeded oracle suites) and benchmark-verified: ~23 µs/file,
-  flat scaling from 1,000 to 200,000 files; 4,000/4,000 planted outliers
-  detected with zero false positives.
+  Property-tested (seeded oracle suites) and benchmark-verified: ~20 µs/file,
+  flat scaling from 1,000 to 1,000,000 files (1M files: 21.8 s, 3.8 GB RSS);
+  20,000/20,000 planted outliers detected with zero false positives. The
+  streaming evidence store means memory scales with distinct facts, not
+  corpus bytes.
 - `wtd --json` emits the full evidence graph (schema `wtd.report.v1`) for
   pipelines and AI explanation layers.
 

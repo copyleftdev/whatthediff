@@ -51,26 +51,30 @@ pub fn detect(
     arena: std.mem.Allocator,
     store: *const evidence.Store,
     anal: *const analysis.Analysis,
-    sets: []const []const types.Identity,
+    sets: []const []const u32,
 ) !Clusters {
     const n = anal.n_artifacts;
     if (n < 3) return empty; // minority bucket requires 1 < k, 2k <= N
 
     // Distinctive identities: minority-bucket, bounded fan-out.
-    var distinctive = std.AutoHashMap(types.Identity, void).init(arena);
-    for (anal.identity_stats) |s| {
-        if (s.bucket == .minority and s.artifacts <= pair_cap) {
-            try distinctive.put(s.identity, {});
+    const n_ids = store.count();
+    var distinctive = try std.DynamicBitSet.initEmpty(arena, n_ids);
+    var n_distinctive: usize = 0;
+    for (0..n_ids) |i| {
+        const k = store.at(i).distinct_artifacts;
+        if (analysis.bucketOf(k, n) == .minority and k <= pair_cap) {
+            distinctive.set(i);
+            n_distinctive += 1;
         }
     }
-    if (distinctive.count() == 0) return empty;
+    if (n_distinctive == 0) return empty;
 
     // |M(a)| — size of each artifact's minority set.
     const msize = try arena.alloc(u32, n);
     @memset(msize, 0);
     for (sets, 0..) |set, aid| {
-        for (set) |id| {
-            if (distinctive.contains(id)) msize[aid] += 1;
+        for (set) |idx| {
+            if (distinctive.isSet(idx)) msize[aid] += 1;
         }
     }
 
@@ -78,19 +82,18 @@ pub fn detect(
     // lists (grouped by artifact because the engine feeds artifacts whole).
     var shared = std.AutoHashMap(u64, u32).init(arena);
     var holders = std.ArrayList(u32).init(arena);
-    var it = store.map.iterator();
-    while (it.next()) |entry| {
-        if (!distinctive.contains(entry.key_ptr.*)) continue;
+    for (0..n_ids) |i| {
+        if (!distinctive.isSet(i)) continue;
         holders.clearRetainingCapacity();
         var last: u32 = std.math.maxInt(u32);
-        for (entry.value_ptr.occurrences.items) |occ| {
+        for (store.at(i).occurrences.items) |occ| {
             if (occ.artifact != last) {
                 last = occ.artifact;
                 try holders.append(occ.artifact);
             }
         }
-        for (holders.items, 0..) |a, i| {
-            for (holders.items[i + 1 ..]) |b| {
+        for (holders.items, 0..) |a, hi| {
+            for (holders.items[hi + 1 ..]) |b| {
                 const gop = try shared.getOrPut(pairKey(a, b));
                 if (!gop.found_existing) gop.value_ptr.* = 0;
                 gop.value_ptr.* += 1;
@@ -177,15 +180,15 @@ fn join(parent: []u32, a: u32, b: u32) void {
 fn buildSignature(
     arena: std.mem.Allocator,
     store: *const evidence.Store,
-    sets: []const []const types.Identity,
+    sets: []const []const u32,
     members: []const u32,
-    distinctive: *const std.AutoHashMap(types.Identity, void),
+    distinctive: *const std.DynamicBitSet,
 ) ![]SignatureItem {
-    var counts = std.AutoArrayHashMap(types.Identity, u32).init(arena);
+    var counts = std.AutoArrayHashMap(u32, u32).init(arena);
     for (members) |m| {
-        for (sets[m]) |id| {
-            if (!distinctive.contains(id)) continue;
-            const gop = try counts.getOrPut(id);
+        for (sets[m]) |idx| {
+            if (!distinctive.isSet(idx)) continue;
+            const gop = try counts.getOrPut(idx);
             if (!gop.found_existing) gop.value_ptr.* = 0;
             gop.value_ptr.* += 1;
         }
@@ -195,7 +198,7 @@ fn buildSignature(
     var it = counts.iterator();
     while (it.next()) |e| {
         if (e.value_ptr.* < 2) continue;
-        const obs = store.get(e.key_ptr.*).?;
+        const obs = store.at(e.key_ptr.*);
         try items.append(.{
             .kind = obs.kind,
             .canonical = obs.canonical,
@@ -238,14 +241,14 @@ fn cohesionOf(
 fn feedArtifact(
     arena: std.mem.Allocator,
     store: *evidence.Store,
-    sets: *std.ArrayList([]types.Identity),
+    sets: *std.ArrayList([]u32),
     aid: u32,
     canonicals: []const []const u8,
 ) !void {
-    var set = std.ArrayList(types.Identity).init(arena);
+    var set = std.ArrayList(u32).init(arena);
     for (canonicals, 0..) |c, line| {
-        const r = try store.add(arena, aid, .{ .kind = .kv, .canonical = c, .line = @intCast(line + 1) });
-        if (r.first_for_artifact) try set.append(r.identity);
+        const r = try store.add(aid, .{ .kind = .kv, .canonical = c, .line = @intCast(line + 1) });
+        if (r.first_for_artifact) try set.append(r.index);
     }
     try sets.append(try set.toOwnedSlice());
 }
@@ -256,7 +259,7 @@ test "detect finds two planted factions and excludes conformers" {
     const arena = arena_state.allocator();
 
     var store = evidence.Store.init(arena);
-    var sets = std.ArrayList([]types.Identity).init(arena);
+    var sets = std.ArrayList([]u32).init(arena);
 
     // 6 conformers: pure core. Faction A (2 files): core + eu deviations.
     // Faction B (3 files): core + debug deviations. Everyone gets unique noise.
@@ -301,7 +304,7 @@ test "detect returns nothing without minority primitives" {
     const arena = arena_state.allocator();
 
     var store = evidence.Store.init(arena);
-    var sets = std.ArrayList([]types.Identity).init(arena);
+    var sets = std.ArrayList([]u32).init(arena);
     for (0..4) |aid| {
         const noise = try std.fmt.allocPrint(arena, "own{d}=x", .{aid});
         try feedArtifact(arena, &store, &sets, @intCast(aid), &.{ "a=1", noise });
@@ -317,7 +320,7 @@ test "three equal factions with no consensus core are all found" {
     const arena = arena_state.allocator();
 
     var store = evidence.Store.init(arena);
-    var sets = std.ArrayList([]types.Identity).init(arena);
+    var sets = std.ArrayList([]u32).init(arena);
 
     // 3 groups of 3, disjoint signatures, nothing shared corpus-wide:
     // core is empty, every file drifts 1.0 — but factions are found.

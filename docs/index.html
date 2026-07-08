@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>WhatTheDiff — semantic diff, drift &amp; outlier detection CLI</title>
-<meta name="description" content="Open-source CLI that compares hundreds of configs, JSON or YAML files at once: finds consensus, ranks drift, flags outliers, and proves every claim with evidence. 23µs per file. Linux, macOS, Windows.">
+<meta name="description" content="Open-source CLI that compares hundreds of configs, JSON or YAML files at once: finds consensus, ranks drift, flags outliers, and proves every claim with evidence. ~20µs per file, proven to one million files. Linux, macOS, Windows.">
 <link rel="canonical" href="https://copyleftdev.github.io/whatthediff/">
 <meta name="theme-color" content="#fcfcfd">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
@@ -14,7 +14,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="WhatTheDiff">
 <meta property="og:title" content="WhatTheDiff — the diff that answers “what actually matters?”">
-<meta property="og:description" content="Point it at N files. It finds the consensus, ranks the drift, flags the outlier — and proves it. 23µs/file, measured to 200,000 artifacts.">
+<meta property="og:description" content="Point it at N files. It finds the consensus, ranks the drift, flags the outlier — and proves it. ~20µs/file, measured to 1,000,000 artifacts.">
 <meta property="og:url" content="https://copyleftdev.github.io/whatthediff/">
 <meta property="og:image" content="https://copyleftdev.github.io/whatthediff/og.png">
 <meta property="og:image:width" content="1200">
@@ -22,7 +22,7 @@
 <meta property="og:image:alt" content="WhatTheDiff — deterministic semantic diff CLI showing a drift report with a flagged outlier">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="WhatTheDiff — the diff that answers “what actually matters?”">
-<meta name="twitter:description" content="Consensus, drift and outliers across N files — with evidence for every claim. 23µs/file. Zero dependencies.">
+<meta name="twitter:description" content="Consensus, drift and outliers across N files — with evidence for every claim. ~20µs/file to 1M files. Zero dependencies.">
 <meta name="twitter:image" content="https://copyleftdev.github.io/whatthediff/og.png">
 
 <!-- Structured data for search engines and LLM crawlers -->
@@ -36,7 +36,7 @@
       "alternateName": "wtd",
       "applicationCategory": "DeveloperApplication",
       "operatingSystem": "Linux, macOS, Windows",
-      "softwareVersion": "0.1.0",
+      "softwareVersion": "0.5.0",
       "description": "Deterministic semantic diff for N artifacts: compares many configs, JSON, YAML or text files at once, finds consensus, ranks drift, flags outliers, and backs every claim with inspectable evidence. The deterministic engine is the source of truth; an AI only explains what the engine proved.",
       "url": "https://copyleftdev.github.io/whatthediff/",
       "downloadUrl": "https://github.com/copyleftdev/whatthediff/releases/latest",
@@ -69,7 +69,7 @@
         {
           "@type": "Question",
           "name": "How fast is WhatTheDiff?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Measured at roughly 23 microseconds per file with flat, linear scaling from 1,000 to 200,000 files (a 200,000-file corpus completes in about 4.6 seconds). Benchmarks assert correctness too: every planted outlier is found with zero false positives at every size." }
+          "acceptedAnswer": { "@type": "Answer", "text": "Measured at roughly 20 microseconds per file with flat, linear scaling from 1,000 to 1,000,000 files (a million-file corpus completes in about 22 seconds using 3.8 GB of memory). Benchmarks assert correctness too: every planted outlier is found with zero false positives at every size — 20,000 of 20,000 at one million files." }
         },
         {
           "@type": "Question",
@@ -432,9 +432,9 @@ Corpus: 5 artifacts · 12 distinct primitives · 34 observations
 
   <div class="stats" role="list" aria-label="Measured performance">
     <div class="wrap">
-      <div class="stat" role="listitem"><b>23 µs</b><span>per file, flat to 200k files</span></div>
-      <div class="stat" role="listitem"><b>200,000</b><span>files analyzed in 4.6 s</span></div>
-      <div class="stat" role="listitem"><b>4,000 / 4,000</b><span>planted outliers found, 0 false positives</span></div>
+      <div class="stat" role="listitem"><b>22 µs</b><span>per file, flat to 1M files</span></div>
+      <div class="stat" role="listitem"><b>1,000,000</b><span>files analyzed in 21.8 s</span></div>
+      <div class="stat" role="listitem"><b>20,000 / 20,000</b><span>planted outliers found, 0 false positives</span></div>
       <div class="stat" role="listitem"><b>0</b><span>dependencies — one static binary</span></div>
       <div class="stat" role="listitem"><b>byte-identical</b><span>same corpus in, same report out</span></div>
     </div>
@@ -562,15 +562,18 @@ Corpus: 5 artifacts · 12 distinct primitives · 34 observations
           </thead>
           <tbody>
             <tr><td>1,000</td><td>20</td><td>0.02 s</td><td>20 µs</td><td><span class="pass">exact · 0 false positives</span></td></tr>
-            <tr><td>10,000</td><td>200</td><td>0.22 s</td><td>22 µs</td><td><span class="pass">exact · 0 false positives</span></td></tr>
-            <tr><td>50,000</td><td>1,000</td><td>1.14 s</td><td>23 µs</td><td><span class="pass">exact · 0 false positives</span></td></tr>
-            <tr><td>200,000</td><td>4,000</td><td>4.63 s</td><td>23 µs</td><td><span class="pass">exact · 0 false positives</span></td></tr>
+            <tr><td>10,000</td><td>200</td><td>0.18 s</td><td>18 µs</td><td><span class="pass">exact · 0 false positives</span></td></tr>
+            <tr><td>50,000</td><td>1,000</td><td>0.93 s</td><td>19 µs</td><td><span class="pass">exact · 0 false positives</span></td></tr>
+            <tr><td>200,000</td><td>4,000</td><td>3.88 s</td><td>19 µs</td><td><span class="pass">exact · 0 false positives</span></td></tr>
+            <tr><td>1,000,000</td><td>20,000</td><td>21.8 s</td><td>22 µs</td><td><span class="pass">exact · 0 false positives</span></td></tr>
           </tbody>
         </table>
       </div>
-      <p class="bench-note">ReleaseFast build on tmpfs, 2026-07-07. Memory is the current ceiling
-      (~9.6 KB resident per artifact), which is why a streaming evidence store is on the roadmap —
-      reproduce any row with <a href="https://github.com/copyleftdev/whatthediff/blob/main/scripts/bench.sh">scripts/bench.sh</a>.</p>
+      <p class="bench-note">ReleaseFast build, 2026-07-07 (v0.5.0 streaming evidence store).
+      File contents live in a per-artifact arena reset after each file, so resident memory
+      scales with distinct facts, not corpus bytes — 1M files run in 3.8&nbsp;GB RSS
+      (2.56M distinct primitives, 41.8M observations). Reproduce any row with
+      <a href="https://github.com/copyleftdev/whatthediff/blob/main/scripts/bench.sh">scripts/bench.sh</a>.</p>
     </div>
   </section>
 
@@ -655,8 +658,9 @@ copyleftdev/whatthediff/main/install.ps1 | iex</pre>
         </details>
         <details>
           <summary>What's on the roadmap?</summary>
-          <p>PDF/XML extractors and a streaming evidence store for millions of artifacts.
-          Already shipped: <span style="font-family:var(--mono);font-size:.9em">wtd ask</span>
+          <p>PDF/XML and source-code extractors.
+          Already shipped: the streaming evidence store (v0.5.0 — one million files in 21.8&nbsp;s
+          and 3.8&nbsp;GB RSS, detection still exact), <span style="font-family:var(--mono);font-size:.9em">wtd ask</span>
           (v0.2.0, the AI adapter over the evidence graph), cross-format canonical unification
           (v0.3.0 — the same fact in JSON, YAML, or INI hashes to the same identity), and
           faction detection (v0.4.0 — groups deviating from consensus together, with their

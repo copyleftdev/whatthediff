@@ -57,26 +57,29 @@ pub fn analyze(
     arena: std.mem.Allocator,
     store: *const evidence.Store,
     n_artifacts: usize,
-    artifact_sets: []const []const types.Identity,
+    artifact_sets: []const []const u32,
 ) !Analysis {
     std.debug.assert(artifact_sets.len == n_artifacts);
 
-    var core = std.AutoHashMap(types.Identity, void).init(arena);
-    var uniques = std.AutoHashMap(types.Identity, void).init(arena);
+    const n_ids = store.count();
+    var core = try std.DynamicBitSet.initEmpty(arena, n_ids);
+    var uniques = try std.DynamicBitSet.initEmpty(arena, n_ids);
     var bucket_counts = [4]usize{ 0, 0, 0, 0 };
+    var core_size: usize = 0;
 
-    const stats = try arena.alloc(IdentityStat, store.map.count());
-    var it = store.map.iterator();
-    var i: usize = 0;
-    while (it.next()) |entry| : (i += 1) {
-        const obs = entry.value_ptr;
+    const stats = try arena.alloc(IdentityStat, n_ids);
+    for (0..n_ids) |i| {
+        const obs = store.at(i);
         const k = obs.distinct_artifacts;
         const bucket = bucketOf(k, n_artifacts);
         bucket_counts[@intFromEnum(bucket)] += 1;
-        if (2 * @as(usize, k) > n_artifacts) try core.put(entry.key_ptr.*, {});
-        if (k == 1 and n_artifacts > 1) try uniques.put(entry.key_ptr.*, {});
+        if (2 * @as(usize, k) > n_artifacts) {
+            core.set(i);
+            core_size += 1;
+        }
+        if (k == 1 and n_artifacts > 1) uniques.set(i);
         stats[i] = .{
-            .identity = entry.key_ptr.*,
+            .identity = store.identityAt(i),
             .kind = obs.kind,
             .canonical = obs.canonical,
             .artifacts = k,
@@ -91,15 +94,14 @@ pub fn analyze(
         }
     }.lessThan);
 
-    const core_size = core.count();
     const artifact_stats = try arena.alloc(ArtifactStat, n_artifacts);
     var drift_sum: f64 = 0;
     for (artifact_sets, 0..) |set, aid| {
         var in_core: u32 = 0;
         var unique: u32 = 0;
-        for (set) |id| {
-            if (core.contains(id)) in_core += 1;
-            if (uniques.contains(id)) unique += 1;
+        for (set) |idx| {
+            if (core.isSet(idx)) in_core += 1;
+            if (uniques.isSet(idx)) unique += 1;
         }
         const union_size = set.len + core_size - in_core;
         const drift: f64 = if (union_size == 0)
@@ -163,24 +165,24 @@ test "analyze finds consensus and ranks drift" {
 
     // 4 artifacts: 0-2 share a core; 3 is a rogue sharing one key.
     var store = evidence.Store.init(arena);
-    var sets = std.ArrayList([]const types.Identity).init(arena);
+    var sets = std.ArrayList([]const u32).init(arena);
 
     const shared = [_][]const u8{ "host=db", "port=5432", "tls=true" };
     const rogue = [_][]const u8{ "host=db", "backdoor=on", "debug=1", "xxx=1", "yyy=2" };
 
     for (0..3) |aid| {
-        var set = std.ArrayList(types.Identity).init(arena);
+        var set = std.ArrayList(u32).init(arena);
         for (shared) |c| {
-            const r = try store.add(arena, @intCast(aid), .{ .kind = .kv, .canonical = c, .line = 1 });
-            if (r.first_for_artifact) try set.append(r.identity);
+            const r = try store.add(@intCast(aid), .{ .kind = .kv, .canonical = c, .line = 1 });
+            if (r.first_for_artifact) try set.append(r.index);
         }
         try sets.append(try set.toOwnedSlice());
     }
     {
-        var set = std.ArrayList(types.Identity).init(arena);
+        var set = std.ArrayList(u32).init(arena);
         for (rogue) |c| {
-            const r = try store.add(arena, 3, .{ .kind = .kv, .canonical = c, .line = 1 });
-            if (r.first_for_artifact) try set.append(r.identity);
+            const r = try store.add(3, .{ .kind = .kv, .canonical = c, .line = 1 });
+            if (r.first_for_artifact) try set.append(r.index);
         }
         try sets.append(try set.toOwnedSlice());
     }

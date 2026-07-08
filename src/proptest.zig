@@ -53,7 +53,7 @@ fn genModel(
 
 const Fed = struct {
     store: evidence.Store,
-    sets: [][]types.Identity,
+    sets: [][]u32,
     adds: u64,
 };
 
@@ -61,7 +61,7 @@ const Fed = struct {
 /// primitive order and injecting duplicate observations.
 fn feed(arena: std.mem.Allocator, model: Model, rand: std.Random, shuffle: bool) !Fed {
     var store = evidence.Store.init(arena);
-    const sets = try arena.alloc([]types.Identity, model.n);
+    const sets = try arena.alloc([]u32, model.n);
     var adds: u64 = 0;
 
     const order = try arena.alloc(usize, model.pool.len);
@@ -69,7 +69,7 @@ fn feed(arena: std.mem.Allocator, model: Model, rand: std.Random, shuffle: bool)
 
     for (0..model.n) |a| {
         if (shuffle) rand.shuffle(usize, order);
-        var set = std.ArrayList(types.Identity).init(arena);
+        var set = std.ArrayList(u32).init(arena);
         for (order) |i| {
             if (!model.membership[a][i]) continue;
             const prim = types.Primitive{
@@ -77,13 +77,13 @@ fn feed(arena: std.mem.Allocator, model: Model, rand: std.Random, shuffle: bool)
                 .canonical = model.pool[i],
                 .line = @intCast(i + 1),
             };
-            const r = try store.add(arena, @intCast(a), prim);
+            const r = try store.add(@intCast(a), prim);
             adds += 1;
-            if (r.first_for_artifact) try set.append(r.identity);
+            if (r.first_for_artifact) try set.append(r.index);
             // Duplicate observation within the same artifact: must count as
             // an occurrence but never as a distinct artifact.
             if (rand.float(f64) < 0.1) {
-                const r2 = try store.add(arena, @intCast(a), prim);
+                const r2 = try store.add(@intCast(a), prim);
                 adds += 1;
                 std.debug.assert(!r2.first_for_artifact);
             }
@@ -663,7 +663,7 @@ test "property: planted factions are recovered exactly" {
         const n = n_conform + total_faction;
 
         var store = evidence.Store.init(arena);
-        var sets = std.ArrayList([]types.Identity).init(arena);
+        var sets = std.ArrayList([]u32).init(arena);
         var aid: u32 = 0;
 
         const core_size = rand.intRangeAtMost(usize, 3, 8);
@@ -674,14 +674,14 @@ test "property: planted factions are recovered exactly" {
             fn go(
                 al: std.mem.Allocator,
                 st: *evidence.Store,
-                se: *std.ArrayList([]types.Identity),
+                se: *std.ArrayList([]u32),
                 id: u32,
                 canonicals: []const []const u8,
             ) !void {
-                var set = std.ArrayList(types.Identity).init(al);
+                var set = std.ArrayList(u32).init(al);
                 for (canonicals, 0..) |c, line| {
-                    const r = try st.add(al, id, .{ .kind = .kv, .canonical = c, .line = @intCast(line + 1) });
-                    if (r.first_for_artifact) try set.append(r.identity);
+                    const r = try st.add(id, .{ .kind = .kv, .canonical = c, .line = @intCast(line + 1) });
+                    if (r.first_for_artifact) try set.append(r.index);
                 }
                 try se.append(try set.toOwnedSlice());
             }
@@ -828,25 +828,25 @@ test "capacity: 2000-artifact corpus preserves global invariants" {
     const shared_pool: usize = 500;
 
     var store = evidence.Store.init(arena);
-    const sets = try arena.alloc([]types.Identity, n);
+    const sets = try arena.alloc([]u32, n);
     var adds: u64 = 0;
 
     for (0..n) |a| {
-        var set = std.ArrayList(types.Identity).init(arena);
+        var set = std.ArrayList(u32).init(arena);
         // ~25 shared primitives, popularity-weighted by pool index.
         for (0..25) |_| {
             const i = rand.uintLessThan(usize, shared_pool);
             const canonical = try std.fmt.allocPrint(arena, "shared{d}=v", .{i});
-            const r = try store.add(arena, @intCast(a), .{ .kind = .kv, .canonical = canonical, .line = 1 });
+            const r = try store.add(@intCast(a), .{ .kind = .kv, .canonical = canonical, .line = 1 });
             adds += 1;
-            if (r.first_for_artifact) try set.append(r.identity);
+            if (r.first_for_artifact) try set.append(r.index);
         }
         // 5 artifact-unique primitives.
         for (0..5) |j| {
             const canonical = try std.fmt.allocPrint(arena, "own{d}_{d}=v", .{ a, j });
-            const r = try store.add(arena, @intCast(a), .{ .kind = .kv, .canonical = canonical, .line = 1 });
+            const r = try store.add(@intCast(a), .{ .kind = .kv, .canonical = canonical, .line = 1 });
             adds += 1;
-            if (r.first_for_artifact) try set.append(r.identity);
+            if (r.first_for_artifact) try set.append(r.index);
         }
         sets[a] = try set.toOwnedSlice();
     }

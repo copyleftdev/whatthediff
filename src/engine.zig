@@ -15,8 +15,9 @@ pub const max_artifact_bytes: usize = 64 * 1024 * 1024;
 pub const Corpus = struct {
     artifacts: []types.Artifact,
     store: evidence.Store,
-    /// Per-artifact deduplicated identity sets, indexed by artifact id.
-    sets: [][]types.Identity,
+    /// Per-artifact deduplicated identity-index sets (dense u32 indexes into
+    /// the store), indexed by artifact id.
+    sets: [][]u32,
     analysis: analysis.Analysis,
     /// Factions: groups deviating from consensus in the same way.
     clusters: cluster.Clusters,
@@ -28,12 +29,23 @@ pub fn run(arena: std.mem.Allocator, paths: []const []const u8) !Corpus {
     const files = try discovery.discover(arena, paths);
 
     var artifacts = std.ArrayList(types.Artifact).init(arena);
-    var sets = std.ArrayList([]types.Identity).init(arena);
+    var sets = std.ArrayList([]u32).init(arena);
     var store = evidence.Store.init(arena);
     var skipped: u32 = 0;
 
+    // Streaming property: file contents, parse trees, and canonical scratch
+    // live in a per-artifact arena that is reset after every file. Only the
+    // store (one canonical copy per distinct fact), the u32 index sets, and
+    // artifact metadata survive — resident memory scales with distinct
+    // facts, not corpus bytes.
+    var scratch_state = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer scratch_state.deinit();
+
     for (files) |f| {
-        const content = std.fs.cwd().readFileAlloc(arena, f.path, max_artifact_bytes) catch {
+        _ = scratch_state.reset(.retain_capacity);
+        const scratch = scratch_state.allocator();
+
+        const content = std.fs.cwd().readFileAlloc(scratch, f.path, max_artifact_bytes) catch {
             skipped += 1;
             continue;
         };
@@ -43,12 +55,12 @@ pub fn run(arena: std.mem.Allocator, paths: []const []const u8) !Corpus {
         }
 
         const id: u32 = @intCast(artifacts.items.len);
-        const prims = try extract.extract(arena, f.kind, content);
+        const prims = try extract.extract(scratch, f.kind, content);
 
-        var set = std.ArrayList(types.Identity).init(arena);
+        var set = std.ArrayList(u32).init(arena);
         for (prims) |p| {
-            const r = try store.add(arena, id, p);
-            if (r.first_for_artifact) try set.append(r.identity);
+            const r = try store.add(id, p);
+            if (r.first_for_artifact) try set.append(r.index);
         }
 
         try artifacts.append(.{
@@ -104,7 +116,7 @@ test "end-to-end pipeline over a temp corpus" {
 
     // a.json and b.json differ only in key order → identical identity sets.
     try std.testing.expectEqual(@as(usize, 2), corpus.sets[0].len);
-    try std.testing.expectEqualSlices(types.Identity, corpus.sets[0], corpus.sets[1]);
+    try std.testing.expectEqualSlices(u32, corpus.sets[0], corpus.sets[1]);
 
     // port=80 and tls=true are majority (2/3); c.json's port=9999 is unique.
     const a = corpus.analysis;
