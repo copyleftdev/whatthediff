@@ -8,6 +8,7 @@ const discovery = @import("discovery.zig");
 const extract = @import("extract.zig");
 const evidence = @import("evidence.zig");
 const analysis = @import("analysis.zig");
+const cluster = @import("cluster.zig");
 
 pub const max_artifact_bytes: usize = 64 * 1024 * 1024;
 
@@ -17,6 +18,8 @@ pub const Corpus = struct {
     /// Per-artifact deduplicated identity sets, indexed by artifact id.
     sets: [][]types.Identity,
     analysis: analysis.Analysis,
+    /// Factions: groups deviating from consensus in the same way.
+    clusters: cluster.Clusters,
     /// Files skipped as binary, oversized, or unreadable.
     skipped: u32,
 };
@@ -58,12 +61,14 @@ pub fn run(arena: std.mem.Allocator, paths: []const []const u8) !Corpus {
     }
 
     const result = try analysis.analyze(arena, &store, artifacts.items.len, sets.items);
+    const clusters = try cluster.detect(arena, &store, &result, sets.items);
 
     return .{
         .artifacts = try artifacts.toOwnedSlice(),
         .store = store,
         .sets = try sets.toOwnedSlice(),
         .analysis = result,
+        .clusters = clusters,
         .skipped = skipped,
     };
 }

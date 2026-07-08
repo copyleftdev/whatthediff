@@ -6,7 +6,7 @@ const engine = @import("engine.zig");
 const render = @import("render.zig");
 const ask = @import("ask.zig");
 
-pub const version = "0.3.0";
+pub const version = "0.4.0";
 
 const usage =
     \\wtd — WhatTheDiff: what actually matters across N artifacts
@@ -20,6 +20,7 @@ const usage =
     \\  --evidence    With --json: emit every occurrence (no per-primitive cap)
     \\  --consensus   Only the consensus section
     \\  --drift       Only the drift section
+    \\  --factions    Only the factions section (groups deviating together)
     \\  --version     Print version
     \\  --help        Print this help
     \\
@@ -60,6 +61,8 @@ pub fn run(arena: std.mem.Allocator, args: []const []const u8) !u8 {
             opts.section = .consensus;
         } else if (std.mem.eql(u8, arg, "--drift")) {
             opts.section = .drift;
+        } else if (std.mem.eql(u8, arg, "--factions")) {
+            opts.section = .factions;
         } else if (std.mem.startsWith(u8, arg, "-")) {
             try std.io.getStdErr().writer().print("wtd: unknown option '{s}'\n\n{s}", .{ arg, usage });
             return 2;

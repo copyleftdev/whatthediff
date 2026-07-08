@@ -19,6 +19,10 @@ Key facts:
   primitive held by a strict majority.
 - Drift per file = 1 − Jaccard(its primitives, consensus core); outliers are
   flagged past mean + 1.5σ.
+- Factions: groups of files deviating from consensus in the same way, found by
+  clustering over minority primitives (Jaccard >= 0.5, union-find). Each
+  faction reports its signature — the shared deviations that define it
+  (e.g. "region=eu, 3/3 members"). `wtd <dir> --factions` shows just this.
 - Fully deterministic engine — no AI, no randomness; byte-identical reports.
   Property-tested (seeded oracle suites) and benchmark-verified: ~23 µs/file,
   flat scaling from 1,000 to 200,000 files; 4,000/4,000 planted outliers

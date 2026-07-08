@@ -106,6 +106,31 @@ pub fn buildEvidence(
     if (order.len > listed) try w.print("  ... {d} more artifacts omitted (lowest drift)\n", .{order.len - listed});
     try w.print("\n", .{});
 
+    // Factions: groups deviating from consensus together.
+    if (corpus.clusters.factions.len > 0) {
+        try w.print("FACTIONS (groups sharing the same deviations from consensus):\n", .{});
+        for (corpus.clusters.factions, 0..) |f, fi| {
+            if (fi >= 6) {
+                try w.print("  ... {d} more factions omitted\n", .{corpus.clusters.factions.len - 6});
+                break;
+            }
+            try w.print("  faction of {d} (cohesion {d:.2}): ", .{ f.members.len, f.cohesion });
+            const shown_m = @min(f.members.len, 8);
+            for (f.members[0..shown_m], 0..) |m, i| {
+                if (i > 0) try w.print(", ", .{});
+                try w.print("{s}", .{corpus.artifacts[m].path});
+            }
+            if (f.members.len > shown_m) try w.print(" (+{d} more)", .{f.members.len - shown_m});
+            try w.print("\n", .{});
+            for (f.signature[0..@min(f.signature.len, 5)]) |sig| {
+                try w.print("    shared deviation: {s} {s} ({d}/{d} members)\n", .{
+                    @tagName(sig.kind), clip(sig.canonical), sig.present, f.members.len,
+                });
+            }
+        }
+        try w.print("\n", .{});
+    }
+
     // Focus detail: question-matched artifacts, else flagged outliers,
     // else the single highest-drift artifact.
     var focus = focus_ids;
@@ -317,11 +342,14 @@ fn testCorpus(arena: std.mem.Allocator) !engine.Corpus {
     }
 
     const result = try analysis.analyze(arena, &store, 4, sets.items);
+    const owned_sets = try sets.toOwnedSlice();
+    const clusters = try @import("cluster.zig").detect(arena, &store, &result, owned_sets);
     return .{
         .artifacts = try artifacts.toOwnedSlice(),
         .store = store,
-        .sets = try sets.toOwnedSlice(),
+        .sets = owned_sets,
         .analysis = result,
+        .clusters = clusters,
         .skipped = 0,
     };
 }

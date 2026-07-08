@@ -85,6 +85,13 @@ The **consensus core** is every primitive held by a strict majority. An
 artifact's **drift** is 1 − Jaccard(its primitives, core); outliers are
 flagged at mean + 1.5σ (N ≥ 4).
 
+**Factions** go beyond outliers: clustering runs over *minority* primitives
+only (the core can't distinguish groups; unique primitives belong to one
+file), so a faction is precisely a set of files sharing the same deviations —
+Jaccard ≥ 0.5 edges, union-find components, and each faction reports its
+*signature* (`region=eu (3/3 members)`). Files matching the consensus form
+the implicit main group and are never listed.
+
 ## 🚀 Quick start
 
 **One-liner** (Linux, macOS, Git Bash — detects your OS/arch, verifies the
@@ -118,6 +125,7 @@ scripts/release.sh                  # test + package dist/*.tar.gz|zip + SHA256S
 | `wtd <path>...` | full human report |
 | `wtd configs/ --drift` | drift ranking only |
 | `wtd configs/ --consensus` | consensus buckets only |
+| `wtd configs/ --factions` | groups deviating from consensus together |
 | `wtd configs/ --json` | machine-readable evidence graph (`wtd.report.v1`) |
 | `wtd configs/ --json --evidence` | uncapped occurrence lists |
 | `wtd ask "<question>" configs/` | AI explains the evidence (see below) |
@@ -220,7 +228,9 @@ Each module is independently testable and replaceable; extractors degrade
   evidence graph (v0.2.0: Anthropic / OpenAI-compatible / local endpoints)
 - [x] Cross-format canonical unification (v0.3.0: same fact in JSON, YAML, or
   INI → same identity; property-tested with random structures serialized both ways)
-- [ ] Pairwise similarity / clustering — find factions, not just outliers
+- [x] Pairwise similarity / clustering — find factions, not just outliers
+  (v0.4.0: minority-set Jaccard + union-find, faction signatures, property-tested
+  exact recovery of planted factions)
 - [ ] PDF, XML, and source-code extractors
 - [ ] Streaming evidence store for millions of artifacts
 

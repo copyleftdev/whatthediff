@@ -631,6 +631,148 @@ test "tri-format corpus: JSON, YAML, and INI of the same config fully agree" {
     }
 }
 
+// ------------------------------------------------- faction recovery -------
+
+const cluster = @import("cluster.zig");
+
+test "property: planted factions are recovered exactly" {
+    var iter: u64 = 0;
+    while (iter < 100) : (iter += 1) {
+        const seed = 0x5eed_0008 + iter;
+        errdefer std.debug.print("\ncounterexample: faction-recovery property, seed=0x{x}\n", .{seed});
+
+        var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena_state.deinit();
+        const arena = arena_state.allocator();
+        var prng = std.Random.DefaultPrng.init(seed);
+        const rand = prng.random();
+
+        // Corpus shape: conformers (pure core + unique noise) plus F factions
+        // with disjoint signature sets. Conformers outnumber the largest
+        // faction so signatures stay in the minority bucket.
+        const n_factions = rand.intRangeAtMost(usize, 1, 3);
+        var faction_sizes: [3]usize = undefined;
+        var max_faction: usize = 0;
+        for (0..n_factions) |f| {
+            faction_sizes[f] = rand.intRangeAtMost(usize, 2, 6);
+            max_faction = @max(max_faction, faction_sizes[f]);
+        }
+        var total_faction: usize = 0;
+        for (faction_sizes[0..n_factions]) |s| total_faction += s;
+        const n_conform = @max(max_faction + 1, rand.intRangeAtMost(usize, 4, 12));
+        const n = n_conform + total_faction;
+
+        var store = evidence.Store.init(arena);
+        var sets = std.ArrayList([]types.Identity).init(arena);
+        var aid: u32 = 0;
+
+        const core_size = rand.intRangeAtMost(usize, 3, 8);
+        const core = try arena.alloc([]const u8, core_size);
+        for (core, 0..) |*c, i| c.* = try std.fmt.allocPrint(arena, "core{d}=v", .{i});
+
+        const feedOne = struct {
+            fn go(
+                al: std.mem.Allocator,
+                st: *evidence.Store,
+                se: *std.ArrayList([]types.Identity),
+                id: u32,
+                canonicals: []const []const u8,
+            ) !void {
+                var set = std.ArrayList(types.Identity).init(al);
+                for (canonicals, 0..) |c, line| {
+                    const r = try st.add(al, id, .{ .kind = .kv, .canonical = c, .line = @intCast(line + 1) });
+                    if (r.first_for_artifact) try set.append(r.identity);
+                }
+                try se.append(try set.toOwnedSlice());
+            }
+        }.go;
+
+        // Conformers.
+        for (0..n_conform) |_| {
+            var prims = std.ArrayList([]const u8).init(arena);
+            try prims.appendSlice(core);
+            try prims.append(try std.fmt.allocPrint(arena, "own{d}=x", .{aid}));
+            try feedOne(arena, &store, &sets, aid, prims.items);
+            aid += 1;
+        }
+
+        // Factions: core + disjoint signature + unique noise per member.
+        var expected: [3][]u32 = undefined;
+        for (0..n_factions) |f| {
+            const sig_size = rand.intRangeAtMost(usize, 2, 5);
+            const sig = try arena.alloc([]const u8, sig_size);
+            for (sig, 0..) |*s, i| s.* = try std.fmt.allocPrint(arena, "fac{d}.k{d}=v", .{ f, i });
+
+            const members = try arena.alloc(u32, faction_sizes[f]);
+            for (members) |*m| {
+                var prims = std.ArrayList([]const u8).init(arena);
+                try prims.appendSlice(core);
+                try prims.appendSlice(sig);
+                try prims.append(try std.fmt.allocPrint(arena, "own{d}=x", .{aid}));
+                try feedOne(arena, &store, &sets, aid, prims.items);
+                m.* = aid;
+                aid += 1;
+            }
+            expected[f] = members;
+        }
+
+        const anal = try analysis.analyze(arena, &store, n, sets.items);
+        const clusters = try cluster.detect(arena, &store, &anal, sets.items);
+
+        try std.testing.expectEqual(n_factions, clusters.factions.len);
+        // Match each expected faction to a detected one by first member.
+        for (expected[0..n_factions]) |want| {
+            var found = false;
+            for (clusters.factions) |got| {
+                if (got.members[0] == want[0]) {
+                    try std.testing.expectEqualSlices(u32, want, got.members);
+                    try std.testing.expectEqual(@as(f64, 1.0), got.cohesion);
+                    found = true;
+                }
+            }
+            try std.testing.expect(found);
+        }
+    }
+}
+
+test "factions survive the full disk pipeline" {
+    var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+
+    // 4 conformers, one 3-member "eu" faction — mixed formats, unified.
+    for (0..4) |i| {
+        const name = try std.fmt.allocPrint(arena, "svc-{d}.yaml", .{i});
+        const body = try std.fmt.allocPrint(arena, "host: db\nport: 5432\ntls: true\nnode: n{d}\n", .{i});
+        try tmp.dir.writeFile(.{ .sub_path = name, .data = body });
+    }
+    for (0..3) |i| {
+        const name = try std.fmt.allocPrint(arena, "svc-eu-{d}.json", .{i});
+        const body = try std.fmt.allocPrint(
+            arena,
+            "{{\"host\": \"db\", \"port\": 5432, \"tls\": true, \"region\": \"eu\", \"dc\": \"fra\", \"node\": \"e{d}\"}}",
+            .{i},
+        );
+        try tmp.dir.writeFile(.{ .sub_path = name, .data = body });
+    }
+
+    const root = try tmp.dir.realpathAlloc(arena, ".");
+    const corpus = try engine.run(arena, &.{root});
+
+    try std.testing.expectEqual(@as(usize, 1), corpus.clusters.factions.len);
+    const f = corpus.clusters.factions[0];
+    try std.testing.expectEqual(@as(usize, 3), f.members.len);
+    for (f.members) |m| {
+        try std.testing.expect(std.mem.indexOf(u8, corpus.artifacts[m].path, "svc-eu-") != null);
+    }
+    try std.testing.expectEqual(@as(usize, 2), f.signature.len);
+    try std.testing.expectEqualStrings("dc=fra", f.signature[0].canonical);
+    try std.testing.expectEqualStrings("region=eu", f.signature[1].canonical);
+}
+
 // ------------------------------------------------ end-to-end shape --------
 
 test "property: full pipeline is byte-deterministic on disk corpora" {

@@ -8,7 +8,7 @@ const hash = @import("hash.zig");
 const engine = @import("engine.zig");
 const analysis = @import("analysis.zig");
 
-pub const Section = enum { all, consensus, drift };
+pub const Section = enum { all, consensus, drift, factions };
 
 pub const Options = struct {
     section: Section = .all,
@@ -32,10 +32,44 @@ pub fn renderText(writer: anytype, corpus: *const engine.Corpus, opts: Options) 
     if (corpus.skipped > 0) try writer.print(" · {d} skipped", .{corpus.skipped});
     try writer.print("\n", .{});
 
-    if (opts.section != .drift) try renderConsensus(writer, a);
-    if (opts.section != .consensus) {
+    if (opts.section == .all or opts.section == .consensus) try renderConsensus(writer, a);
+    if (opts.section == .all or opts.section == .drift) {
         try renderDrift(writer, corpus);
+    }
+    if (opts.section == .all or opts.section == .factions) {
+        try renderFactions(writer, corpus, opts.section == .factions);
+    }
+    if (opts.section == .all or opts.section == .drift) {
         try renderUniqueEvidence(writer, corpus);
+    }
+}
+
+fn renderFactions(writer: anytype, corpus: *const engine.Corpus, explicit: bool) !void {
+    const factions = corpus.clusters.factions;
+    if (factions.len == 0) {
+        if (explicit) try writer.print("\nNo factions detected (no shared deviations from consensus).\n", .{});
+        return;
+    }
+
+    try writer.print("\nFactions (groups deviating from consensus in the same way)\n", .{});
+    for (factions) |f| {
+        try writer.print("  faction of {d} · cohesion {d:.2}\n", .{ f.members.len, f.cohesion });
+        try writer.print("    members: ", .{});
+        const shown = @min(f.members.len, 8);
+        for (f.members[0..shown], 0..) |m, i| {
+            if (i > 0) try writer.print(", ", .{});
+            try writer.print("{s}", .{corpus.artifacts[m].path});
+        }
+        if (f.members.len > shown) try writer.print(" … +{d} more", .{f.members.len - shown});
+        try writer.print("\n", .{});
+        for (f.signature[0..@min(f.signature.len, 5)]) |sig| {
+            try writer.print("    shared: {s} {s}  ({d}/{d} members)\n", .{
+                @tagName(sig.kind),
+                truncateUtf8(sig.canonical, canonical_display_max),
+                sig.present,
+                f.members.len,
+            });
+        }
     }
 }
 
@@ -167,6 +201,20 @@ const JsonArtifact = struct {
     outlier: bool,
 };
 
+const JsonSignatureItem = struct {
+    kind: []const u8,
+    canonical: []const u8,
+    present: u32,
+};
+
+const JsonFaction = struct {
+    size: usize,
+    members: []u32,
+    member_paths: []const []const u8,
+    cohesion: f64,
+    signature: []JsonSignatureItem,
+};
+
 const JsonReport = struct {
     schema: []const u8,
     corpus: struct {
@@ -183,6 +231,7 @@ const JsonReport = struct {
         core_size: usize,
     },
     drift: struct { mean: f64, stddev: f64 },
+    factions: []JsonFaction,
     artifacts: []JsonArtifact,
     evidence: []JsonEvidence,
 };
@@ -230,6 +279,23 @@ pub fn renderJson(
         };
     }
 
+    const factions_out = try arena.alloc(JsonFaction, corpus.clusters.factions.len);
+    for (corpus.clusters.factions, 0..) |f, i| {
+        const paths = try arena.alloc([]const u8, f.members.len);
+        for (f.members, 0..) |m, j| paths[j] = corpus.artifacts[m].path;
+        const sig = try arena.alloc(JsonSignatureItem, f.signature.len);
+        for (f.signature, 0..) |s, j| {
+            sig[j] = .{ .kind = @tagName(s.kind), .canonical = s.canonical, .present = s.present };
+        }
+        factions_out[i] = .{
+            .size = f.members.len,
+            .members = f.members,
+            .member_paths = paths,
+            .cohesion = f.cohesion,
+            .signature = sig,
+        };
+    }
+
     const report = JsonReport{
         .schema = "wtd.report.v1",
         .corpus = .{
@@ -246,6 +312,7 @@ pub fn renderJson(
             .core_size = a.core_size,
         },
         .drift = .{ .mean = a.mean_drift, .stddev = a.std_drift },
+        .factions = factions_out,
         .artifacts = artifacts,
         .evidence = evidence_out,
     };
