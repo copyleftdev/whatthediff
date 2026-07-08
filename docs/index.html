@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>WhatTheDiff — semantic diff &amp; fuzzy binary similarity CLI</title>
-<meta name="description" content="Compare N files by meaning — configs, JSON, YAML, XML, PDF, even executables (SSDeep-class fuzzy hashing). Consensus, drift, outliers and variant families, backed by evidence.">
+<meta name="description" content="Compare N files by meaning — configs, JSON, YAML, XML, PDF, CBOR, even executables (SSDeep-class fuzzy hashing). Consensus, drift, the agreed value per key and which files disagree, outliers and variant families, backed by evidence.">
 <link rel="canonical" href="https://copyleftdev.github.io/whatthediff/">
 <meta name="theme-color" content="#fcfcfd">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
@@ -37,7 +37,7 @@
       "alternateName": "wtd",
       "applicationCategory": "DeveloperApplication",
       "operatingSystem": "Linux, macOS, Windows",
-      "softwareVersion": "1.2.0",
+      "softwareVersion": "1.3.0",
       "description": "Deterministic semantic diff for N artifacts: compares many files at once — configs, JSON, YAML, XML, PDF, and even executables via SSDeep-class content-defined chunking — to find consensus, drift, outliers and variant families, backing every claim with inspectable evidence. The deterministic engine is the source of truth; an AI only explains what the engine proved.",
       "url": "https://copyleftdev.github.io/whatthediff/",
       "downloadUrl": "https://github.com/copyleftdev/whatthediff/releases/latest",
@@ -86,6 +86,11 @@
           "@type": "Question",
           "name": "Can WhatTheDiff compare credential or .env profiles safely?",
           "acceptedAnswer": { "@type": "Answer", "text": "Yes. The --keys-only flag compares files by structure instead of content: it drops the value from every key=value primitive (db.port=5432 becomes db.port) and hashes structureless lines, so no secret ever enters the report or JSON output. Point it at a folder of .env files or credential profiles to find schema drift — which environment is missing a key, which profiles share an auth shape — without exposing a single value. Shell-style export KEY=value is normalized to KEY so it matches bare declarations." }
+        },
+        {
+          "@type": "Question",
+          "name": "Can WhatTheDiff tell me which config value is wrong across a fleet?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes — that is what the --conflicts flag does. For every scalar key, it reports the value the fleet agrees on (the plurality) and names exactly which files hold a deviant value, for example 'db.port: 40 files say 5432, 1 says 5433 (prod-17.yaml)'. It works across formats, so a value in a JSON file is reconciled against the same key in a YAML file. List keys are treated as bags and never flagged, and identifier fields where every file differs (hostnames, node ids) are excluded automatically. Under --keys-only no values are compared at all, so it stays secret-safe. The full conflict data, including per-value witness sets, is also in the --json output." }
         },
         {
           "@type": "Question",
@@ -429,7 +434,7 @@
   <div class="hero">
     <div class="wrap">
       <div>
-        <span class="eyebrow rise">Deterministic semantic diff · v1.2.0</span>
+        <span class="eyebrow rise">Deterministic semantic diff · v1.3.0</span>
         <h1 class="rise">The diff that answers<br>“what actually matters?”</h1>
         <p class="lede rise">Point <strong>wtd</strong> at a directory of configs, contracts, or JSON.
         It finds the <strong>consensus</strong>, ranks the <strong>drift</strong>, flags the
@@ -629,6 +634,38 @@ Corpus: 5 artifacts · 12 distinct primitives · 34 observations
     </div>
   </section>
 
+  <section id="conflicts" style="padding-top:0">
+    <div class="wrap">
+      <span class="kicker">The odd-one-out report</span>
+      <h2>Which one is wrong — and what should it be?</h2>
+      <p class="sub">Drift and factions tell you <em>which files</em> differ. <code style="font-family:var(--mono);font-size:.85em">--conflicts</code>
+      answers the question ops actually asks: for a given key, what value does the fleet agree on, and
+      <strong>exactly which files disagree</strong>? The <span aria-hidden="true">✓</span> marks the consensus value;
+      every other row names the deviants — <strong>across formats</strong>, since a JSON <code style="font-family:var(--mono);font-size:.85em">5432</code>
+      and a YAML <code style="font-family:var(--mono);font-size:.85em">5432</code> are one and the same fact.</p>
+
+      <div class="fam-term" aria-label="wtd conflicts output on a config fleet">
+        <pre><span class="dim">$</span> <span class="hd">wtd configs/ --conflicts</span>
+
+<span class="hd">Conflicts</span> <span class="dim">(scalar keys the fleet disagrees on)</span>
+  db.port
+    <span class="fa">✓  40×  5432</span>
+        <span class="fb">1×  5433</span>   prod-17.yaml
+  logging.level
+    <span class="fa">✓  38×  info</span>
+        <span class="fb">3×  debug</span>  staging-2.json, staging-7.json, staging-9.json
+  <span class="dim">2 keys in conflict</span></pre>
+      </div>
+
+      <p class="sub" style="margin-top:var(--space-md)">Two exclusions keep the signal clean: <strong>list keys</strong>
+      (<code style="font-family:var(--mono);font-size:.85em">features[]</code>) are bags, so many values are never a conflict; and a key
+      is only flagged when its plurality value is shared by <strong>two or more files</strong>, which drops identifier fields
+      (hostnames, node ids) where every file legitimately differs. Under <code style="font-family:var(--mono);font-size:.85em">--keys-only</code>
+      values are gone entirely — so conflicts reports nothing, <strong>secret-safe by construction</strong>. Every conflict is in the
+      <code style="font-family:var(--mono);font-size:.85em">--json</code> evidence graph too, with per-value witness sets.</p>
+    </div>
+  </section>
+
   <section id="binary">
     <div class="wrap">
       <span class="kicker">Beyond text</span>
@@ -721,7 +758,7 @@ copyleftdev/whatthediff/main/install.ps1 | iex</pre>
         <svg class="icon" viewBox="0 0 15 15" fill="none" aria-hidden="true"><path d="M7.49915 0.877045C11.1566 0.877045 14.1218 3.84178 14.1222 7.49911C14.1222 11.1568 11.1568 14.1222 7.49915 14.1222C3.84181 14.1218 0.877075 11.1565 0.877075 7.49911C0.877486 3.84203 3.84206 0.877456 7.49915 0.877045ZM7.49915 1.82626C4.36673 1.82667 1.8267 4.3667 1.82629 7.49911C1.82629 10.6319 4.36648 13.1716 7.49915 13.172C10.6321 13.172 13.172 10.6321 13.172 7.49911C13.1716 4.36645 10.6319 1.82626 7.49915 1.82626ZM9.34094 4.96201C9.49988 4.73626 9.81241 4.68202 10.0382 4.84091C10.2639 4.99988 10.3182 5.31242 10.1593 5.53818L6.99231 10.0382C6.90692 10.1594 6.7719 10.236 6.62415 10.2481C6.47636 10.2602 6.33063 10.2064 6.22668 10.1007L4.64368 8.4874L5.00012 8.13779L5.35657 7.7872L6.51965 8.97079L9.34094 4.96201ZM4.64954 7.78036C4.84653 7.58696 5.16309 7.5903 5.35657 7.7872L4.64368 8.4874C4.45023 8.29035 4.4525 7.97382 4.64954 7.78036Z" fill="currentColor"/></svg>
         <span>Both installers verify the download against the release's published
         <code style="font-family:var(--mono);font-size:.85em">SHA256SUMS</code> before installing — and refuse on mismatch.
-        Pin a version with <code style="font-family:var(--mono);font-size:.85em">WTD_VERSION=v1.2.0</code>, or grab binaries yourself from
+        Pin a version with <code style="font-family:var(--mono);font-size:.85em">WTD_VERSION=v1.3.0</code>, or grab binaries yourself from
         <a href="https://github.com/copyleftdev/whatthediff/releases/latest">GitHub Releases</a>.</span>
       </div>
     </div>

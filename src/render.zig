@@ -7,8 +7,9 @@ const types = @import("types.zig");
 const hash = @import("hash.zig");
 const engine = @import("engine.zig");
 const analysis = @import("analysis.zig");
+const conflicts_mod = @import("conflicts.zig");
 
-pub const Section = enum { all, consensus, drift, factions };
+pub const Section = enum { all, consensus, drift, factions, conflicts };
 
 pub const Options = struct {
     section: Section = .all,
@@ -18,6 +19,11 @@ pub const Options = struct {
 
 const occurrence_cap = 16;
 const canonical_display_max = 96;
+// Conflict display budgets: keep default output readable; --conflicts is full.
+const conflicts_in_all = 10;
+const conflict_values_shown = 6;
+const conflict_files_shown = 8;
+const value_display_max = 48;
 
 // ---------------------------------------------------------------- text ----
 
@@ -36,12 +42,79 @@ pub fn renderText(writer: anytype, corpus: *const engine.Corpus, opts: Options) 
     if (opts.section == .all or opts.section == .drift) {
         try renderDrift(writer, corpus);
     }
+    if (opts.section == .all or opts.section == .conflicts) {
+        try renderConflicts(writer, corpus, opts.section == .conflicts);
+    }
     if (opts.section == .all or opts.section == .factions) {
         try renderFactions(writer, corpus, opts.section == .factions);
     }
     if (opts.section == .all or opts.section == .drift) {
         try renderUniqueEvidence(writer, corpus);
     }
+}
+
+/// The odd-one-out report: scalar keys the fleet disagrees on, plurality
+/// value marked, deviant files named. `explicit` (from --conflicts) prints
+/// every conflict; default output caps the list and points to --conflicts.
+fn renderConflicts(writer: anytype, corpus: *const engine.Corpus, explicit: bool) !void {
+    const items = corpus.conflicts.items;
+    if (items.len == 0) {
+        if (explicit) try writer.print("\nNo conflicts (every scalar key the fleet shares agrees).\n", .{});
+        return;
+    }
+
+    // Order for reading: clearest odd-one-out first (fewest deviants), then
+    // widest consensus, then key for stability. JSON keeps canonical key order.
+    const order = try orderedConflicts(corpus);
+    const limit = if (explicit) order.len else @min(order.len, conflicts_in_all);
+
+    try writer.print("\nConflicts (scalar keys the fleet disagrees on)\n", .{});
+    for (order[0..limit]) |c| {
+        try writer.print("  {s}\n", .{c.key});
+        const groups_shown = @min(c.values.len, conflict_values_shown);
+        for (c.values[0..groups_shown], 0..) |g, gi| {
+            const mark: []const u8 = if (gi == 0) "\u{2713}" else " ";
+            try writer.print("    {s} {d:>4}\u{00d7}  {s}", .{
+                mark,
+                g.artifacts.len,
+                truncateUtf8(g.value, value_display_max),
+            });
+            if (g.value.len > value_display_max) try writer.print("\u{2026}", .{});
+            if (gi > 0) {
+                // Name the deviant files holding this minority value.
+                try writer.print("   ", .{});
+                const files_shown = @min(g.artifacts.len, conflict_files_shown);
+                for (g.artifacts[0..files_shown], 0..) |m, fi| {
+                    if (fi > 0) try writer.print(", ", .{});
+                    try writer.print("{s}", .{corpus.artifacts[m].path});
+                }
+                if (g.artifacts.len > files_shown) {
+                    try writer.print(" \u{2026}+{d}", .{g.artifacts.len - files_shown});
+                }
+            }
+            try writer.print("\n", .{});
+        }
+        if (c.values.len > groups_shown) {
+            try writer.print("    \u{2026} +{d} more values\n", .{c.values.len - groups_shown});
+        }
+    }
+    if (limit < order.len) {
+        try writer.print("  … +{d} more conflicting keys (run with --conflicts)\n", .{order.len - limit});
+    }
+    try writer.print("  {d} keys in conflict\n", .{order.len});
+}
+
+fn orderedConflicts(corpus: *const engine.Corpus) ![]conflicts_mod.Conflict {
+    const alloc = corpus.store.map.allocator;
+    const copy = try alloc.dupe(conflicts_mod.Conflict, corpus.conflicts.items);
+    std.mem.sort(conflicts_mod.Conflict, copy, {}, struct {
+        fn lessThan(_: void, x: conflicts_mod.Conflict, y: conflicts_mod.Conflict) bool {
+            if (x.deviants != y.deviants) return x.deviants < y.deviants;
+            if (x.holders != y.holders) return x.holders > y.holders;
+            return std.mem.lessThan(u8, x.key, y.key);
+        }
+    }.lessThan);
+    return copy;
 }
 
 fn renderFactions(writer: anytype, corpus: *const engine.Corpus, explicit: bool) !void {
@@ -219,6 +292,19 @@ const JsonFaction = struct {
     signature: []JsonSignatureItem,
 };
 
+const JsonValueGroup = struct {
+    value: []const u8,
+    count: u32,
+    artifacts: []const u32,
+};
+
+const JsonConflict = struct {
+    key: []const u8,
+    holders: u32,
+    deviants: u32,
+    values: []JsonValueGroup,
+};
+
 const JsonReport = struct {
     schema: []const u8,
     corpus: struct {
@@ -235,6 +321,7 @@ const JsonReport = struct {
         core_size: usize,
     },
     drift: struct { mean: f64, stddev: f64 },
+    conflicts: []JsonConflict,
     factions: []JsonFaction,
     artifacts: []JsonArtifact,
     evidence: []JsonEvidence,
@@ -283,6 +370,15 @@ pub fn renderJson(
         };
     }
 
+    const conflicts_out = try arena.alloc(JsonConflict, corpus.conflicts.items.len);
+    for (corpus.conflicts.items, 0..) |c, i| {
+        const groups = try arena.alloc(JsonValueGroup, c.values.len);
+        for (c.values, 0..) |g, j| {
+            groups[j] = .{ .value = g.value, .count = @intCast(g.artifacts.len), .artifacts = g.artifacts };
+        }
+        conflicts_out[i] = .{ .key = c.key, .holders = c.holders, .deviants = c.deviants, .values = groups };
+    }
+
     const factions_out = try arena.alloc(JsonFaction, corpus.clusters.factions.len);
     for (corpus.clusters.factions, 0..) |f, i| {
         const paths = try arena.alloc([]const u8, f.members.len);
@@ -316,6 +412,7 @@ pub fn renderJson(
             .core_size = a.core_size,
         },
         .drift = .{ .mean = a.mean_drift, .stddev = a.std_drift },
+        .conflicts = conflicts_out,
         .factions = factions_out,
         .artifacts = artifacts,
         .evidence = evidence_out,

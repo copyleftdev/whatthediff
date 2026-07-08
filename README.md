@@ -4,10 +4,10 @@
 
 **Traditional diff tools answer *"what changed?"* — WTD answers *"what actually matters?"***
 
-[![Version](https://img.shields.io/badge/version-1.2.0-0090ff)](https://github.com/copyleftdev/whatthediff/releases/latest)
+[![Version](https://img.shields.io/badge/version-1.3.0-0090ff)](https://github.com/copyleftdev/whatthediff/releases/latest)
 [![Zig](https://img.shields.io/badge/Zig-0.14-f7a41d?logo=zig&logoColor=white)](https://ziglang.org)
-[![Tests](https://img.shields.io/badge/tests-76%2F76-brightgreen)](#-testing)
-[![Property iterations](https://img.shields.io/badge/property_iterations-1065-brightgreen)](#-testing)
+[![Tests](https://img.shields.io/badge/tests-83%2F83-brightgreen)](#-testing)
+[![Property iterations](https://img.shields.io/badge/property_iterations-1335-brightgreen)](#-testing)
 [![Scale](https://img.shields.io/badge/1M_files-22µs%2Ffile-blue)](#-scale)
 [![Deterministic](https://img.shields.io/badge/reports-byte--identical-8A2BE2)](#-testing)
 [![Dependencies](https://img.shields.io/badge/dependencies-0-lightgrey)](#-architecture)
@@ -115,7 +115,7 @@ curl -fsSL https://raw.githubusercontent.com/copyleftdev/whatthediff/main/instal
 irm https://raw.githubusercontent.com/copyleftdev/whatthediff/main/install.ps1 | iex
 ```
 
-Pin a version with `WTD_VERSION=v1.2.0`, choose a directory with
+Pin a version with `WTD_VERSION=v1.3.0`, choose a directory with
 `WTD_INSTALL_DIR`. Or grab a binary yourself from
 [Releases](../../releases) — static, zero-install, for Linux
 (x86_64/aarch64, fully static musl), macOS (Intel/Apple Silicon), and
@@ -133,6 +133,7 @@ scripts/release.sh                  # test + package dist/*.tar.gz|zip + SHA256S
 | `wtd <path>...` | full human report |
 | `wtd configs/ --drift` | drift ranking only |
 | `wtd configs/ --consensus` | consensus buckets only |
+| `wtd configs/ --conflicts` | keys the fleet disagrees on: majority value + the deviant files |
 | `wtd configs/ --factions` | groups deviating from consensus together |
 | `wtd creds/ --keys-only` | compare structure not values — secret-safe schema drift |
 | `wtd configs/ --json` | machine-readable evidence graph (`wtd.report.v1`) |
@@ -146,6 +147,37 @@ scripts/release.sh                  # test + package dist/*.tar.gz|zip + SHA256S
 > find *schema* drift ("which env is missing a key?", "which profiles share an
 > auth shape?") without exposing a single value. Shell `export KEY=…` is
 > normalized to `KEY` so it matches bare declarations.
+
+## 🎯 Conflicts — the odd-one-out report
+
+Drift and factions tell you *which files* differ. `--conflicts` answers the
+sharper operational question: for a given key, **what value does the fleet
+agree on, and exactly which files disagree?**
+
+```console
+$ wtd configs/ --conflicts
+
+Conflicts (scalar keys the fleet disagrees on)
+  db.port
+    ✓   40×  5432
+         1×  5433   prod-17.yaml
+  logging.level
+    ✓   38×  info
+         3×  debug  staging-2.json, staging-7.json, staging-9.json
+  2 keys in conflict
+```
+
+The `✓` marks the plurality (consensus) value; every other row names the files
+holding a deviant value. It is **cross-format**: the 40 votes for `5432` may be
+JSON while the deviant is YAML — same key, same canonical, one reconciliation.
+
+Two deliberate exclusions keep the signal clean: **list keys** (`features[]`)
+are bags, not scalars, so multiple values are never a conflict; and a key is
+only reported when its plurality value is shared by **≥ 2 files**, which drops
+identifier fields (hostnames, node ids) where every file legitimately differs.
+Under `--keys-only` values are gone entirely, so conflicts reports nothing —
+secret-safe by construction. Machine-readable via `--json` (`conflicts[]`, each
+with `key`, `holders`, `deviants`, and per-value witness sets).
 
 ## 🤖 wtd ask
 
@@ -308,8 +340,19 @@ original spec (SSDeep-class binary analysis, secret-safe schema comparison).
   (v0.9.0: compare credential/env profiles by key structure, no value ever
   reaches the report)
 
-*Post-1.0 ideas:* semantic source-code extractors, pairwise similarity matrix
-export, a `wtd triage` recipe for malware sample sets.
+**Post-1.0, shipped:**
+
+- [x] JSONC tolerance (v1.1.0: `tsconfig.json` / VS Code settings — comments and
+  trailing commas stripped on parse failure, string literals preserved)
+- [x] CBOR extractor (v1.2.0: RFC 8949 binary decoder — the same fact in CBOR
+  and JSON hashes to one identity; property-tested JSON↔CBOR)
+- [x] Conflicts — the odd-one-out report (v1.3.0: `--conflicts` reports the
+  fleet's agreed value per scalar key and names the deviant files; cross-format,
+  secret-safe under `--keys-only`; property-tested planted-conflict recovery)
+
+*Still ideas:* semantic source-code extractors, pairwise similarity matrix
+export, a `wtd triage` recipe for malware sample sets, and a `--fail-on`
+CI gate built on the conflicts engine.
 
 ## 📜 Design notes
 

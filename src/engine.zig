@@ -9,6 +9,7 @@ const extract = @import("extract.zig");
 const evidence = @import("evidence.zig");
 const analysis = @import("analysis.zig");
 const cluster = @import("cluster.zig");
+const conflicts = @import("conflicts.zig");
 
 pub const max_artifact_bytes: usize = 64 * 1024 * 1024;
 
@@ -21,6 +22,8 @@ pub const Corpus = struct {
     analysis: analysis.Analysis,
     /// Factions: groups deviating from consensus in the same way.
     clusters: cluster.Clusters,
+    /// Value conflicts: scalar keys the fleet disagrees on.
+    conflicts: conflicts.Conflicts,
     /// Files skipped as binary, oversized, or unreadable.
     skipped: u32,
 };
@@ -123,6 +126,7 @@ pub fn runOpts(arena: std.mem.Allocator, paths: []const []const u8, opts: RunOpt
 
     const result = try analysis.analyze(arena, &store, artifacts.items.len, sets.items);
     const clusters = try cluster.detect(arena, &store, &result, sets.items);
+    const conflict_report = try conflicts.detect(arena, &store, artifacts.items.len);
 
     return .{
         .artifacts = try artifacts.toOwnedSlice(),
@@ -130,6 +134,7 @@ pub fn runOpts(arena: std.mem.Allocator, paths: []const []const u8, opts: RunOpt
         .sets = try sets.toOwnedSlice(),
         .analysis = result,
         .clusters = clusters,
+        .conflicts = conflict_report,
         .skipped = skipped,
     };
 }

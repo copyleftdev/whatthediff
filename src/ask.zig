@@ -346,12 +346,14 @@ fn testCorpus(arena: std.mem.Allocator) !engine.Corpus {
     const result = try analysis.analyze(arena, &store, 4, sets.items);
     const owned_sets = try sets.toOwnedSlice();
     const clusters = try @import("cluster.zig").detect(arena, &store, &result, owned_sets);
+    const conflict_report = try @import("conflicts.zig").detect(arena, &store, 4);
     return .{
         .artifacts = try artifacts.toOwnedSlice(),
         .store = store,
         .sets = owned_sets,
         .analysis = result,
         .clusters = clusters,
+        .conflicts = conflict_report,
         .skipped = 0,
     };
 }

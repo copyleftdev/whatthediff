@@ -34,6 +34,7 @@ test {
     _ = @import("cli.zig");
     _ = @import("proptest.zig");
     _ = @import("cluster.zig");
+    _ = @import("conflicts.zig");
     _ = @import("ai.zig");
     _ = @import("ask.zig");
 }

@@ -6,7 +6,7 @@ const engine = @import("engine.zig");
 const render = @import("render.zig");
 const ask = @import("ask.zig");
 
-pub const version = "1.2.0";
+pub const version = "1.3.0";
 
 const usage =
     \\wtd — WhatTheDiff: what actually matters across N artifacts
@@ -20,6 +20,8 @@ const usage =
     \\  --evidence    With --json: emit every occurrence (no per-primitive cap)
     \\  --consensus   Only the consensus section
     \\  --drift       Only the drift section
+    \\  --conflicts   Only the conflicts section (scalar keys the fleet
+    \\                disagrees on: majority value + the deviant files)
     \\  --factions    Only the factions section (groups deviating together)
     \\  --keys-only   Compare structure, not values (drops values from key=value
     \\                primitives, hashes raw lines). Secret-safe: point it at
@@ -34,6 +36,7 @@ const usage =
     \\
     \\Examples:
     \\  wtd configs/
+    \\  wtd configs/ --conflicts
     \\  wtd contracts/ --drift
     \\  wtd a.json b.json c.json --json
     \\  wtd ask "why is svc-d.yaml different?" configs/
@@ -65,6 +68,8 @@ pub fn run(arena: std.mem.Allocator, args: []const []const u8) !u8 {
             opts.section = .consensus;
         } else if (std.mem.eql(u8, arg, "--drift")) {
             opts.section = .drift;
+        } else if (std.mem.eql(u8, arg, "--conflicts")) {
+            opts.section = .conflicts;
         } else if (std.mem.eql(u8, arg, "--factions")) {
             opts.section = .factions;
         } else if (std.mem.eql(u8, arg, "--keys-only")) {

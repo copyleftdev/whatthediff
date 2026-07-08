@@ -320,6 +320,81 @@ test "property: a planted rogue is always the flagged outlier" {
     }
 }
 
+// --------------------------------------------- conflict detection ---------
+
+const conflicts_mod = @import("conflicts.zig");
+
+test "property: a planted value conflict is detected with exact plurality and deviants" {
+    var iter: u64 = 0;
+    while (iter < 120) : (iter += 1) {
+        const seed = 0x5eed_000c + iter;
+        errdefer std.debug.print("\ncounterexample: conflict-detection property, seed=0x{x}\n", .{seed});
+
+        var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena_state.deinit();
+        const arena = arena_state.allocator();
+        var prng = std.Random.DefaultPrng.init(seed);
+        const rand = prng.random();
+
+        const n = rand.intRangeAtMost(usize, 4, 20);
+        // Keep the plurality (base) value shared by >= 2 artifacts.
+        const n_deviant = rand.intRangeAtMost(usize, 1, n - 2);
+
+        // Pick which artifacts deviate on the conflict key.
+        const ids = try arena.alloc(u32, n);
+        for (ids, 0..) |*v, i| v.* = @intCast(i);
+        rand.shuffle(u32, ids);
+        const deviant_ids = try arena.dupe(u32, ids[0..n_deviant]);
+        std.mem.sort(u32, deviant_ids, {}, ltU32);
+        const is_deviant = try arena.alloc(bool, n);
+        @memset(is_deviant, false);
+        for (deviant_ids) |d| is_deviant[d] = true;
+
+        const n_shared = rand.intRangeAtMost(usize, 1, 5);
+
+        var store = evidence.Store.init(arena);
+        for (0..n) |aid| {
+            const a: u32 = @intCast(aid);
+            // Unanimous shared scalar keys — must never be conflicts.
+            for (0..n_shared) |s| {
+                const c = try std.fmt.allocPrint(arena, "shared{d}=base", .{s});
+                _ = try store.add(a, .{ .kind = .kv, .canonical = c, .line = 1 });
+            }
+            // The conflict key: base for conformers, a unique value per deviant.
+            const cv = if (is_deviant[aid])
+                try std.fmt.allocPrint(arena, "ckey=dev{d}", .{aid})
+            else
+                "ckey=base";
+            _ = try store.add(a, .{ .kind = .kv, .canonical = cv, .line = 1 });
+            // A list key with per-file variation — a bag, never a conflict.
+            _ = try store.add(a, .{ .kind = .kv, .canonical = "tags[]=common", .line = 1 });
+            const lu = try std.fmt.allocPrint(arena, "tags[]=t{d}", .{aid});
+            _ = try store.add(a, .{ .kind = .kv, .canonical = lu, .line = 1 });
+        }
+
+        const report = try conflicts_mod.detect(arena, &store, n);
+
+        // Exactly one conflict: ckey. Shared keys are unanimous; tags[] is a bag.
+        try std.testing.expectEqual(@as(usize, 1), report.items.len);
+        const ck = report.items[0];
+        try std.testing.expectEqualStrings("ckey", ck.key);
+        try std.testing.expectEqualStrings("base", ck.values[0].value);
+        try std.testing.expectEqual(@as(usize, n - n_deviant), ck.values[0].artifacts.len);
+        try std.testing.expectEqual(@as(u32, @intCast(n_deviant)), ck.deviants);
+        try std.testing.expectEqual(@as(u32, @intCast(n)), ck.holders);
+
+        // The reported deviant artifacts are exactly the planted set.
+        var got = std.ArrayList(u32).init(arena);
+        for (ck.values[1..]) |g| try got.appendSlice(g.artifacts);
+        std.mem.sort(u32, got.items, {}, ltU32);
+        try std.testing.expectEqualSlices(u32, deviant_ids, got.items);
+    }
+}
+
+fn ltU32(_: void, a: u32, b: u32) bool {
+    return a < b;
+}
+
 // ------------------------------------------- extractor equivalence --------
 
 const JsonNode = union(enum) {
