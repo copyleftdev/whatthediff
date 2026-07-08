@@ -12,6 +12,7 @@
 [![Deterministic](https://img.shields.io/badge/reports-byte--identical-8A2BE2)](#-testing)
 [![Dependencies](https://img.shields.io/badge/dependencies-0-lightgrey)](#-architecture)
 [![Platforms](https://img.shields.io/badge/platforms-Linux%20·%20macOS%20·%20Windows-informational)](#-quick-start)
+[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 </div>
 
@@ -311,3 +312,7 @@ export, a `wtd triage` recipe for malware sample sets.
 
 The full engineering philosophy — deterministic pipeline, evidence model,
 AI responsibilities, non-goals — lives in [intent.md](intent.md).
+
+## 📄 License
+
+[MIT](LICENSE) © copyleftdev
