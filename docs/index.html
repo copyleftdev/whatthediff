@@ -194,7 +194,7 @@
     display:grid; grid-template-columns:minmax(0,5fr) minmax(0,6fr);
     gap:var(--space-3xl); align-items:center;
   }
-  @media (max-width:900px){ .hero .wrap { grid-template-columns:1fr; gap:var(--space-2xl); } }
+  @media (max-width:900px){ .hero .wrap { grid-template-columns:minmax(0,1fr); gap:var(--space-2xl); } }
 
   .eyebrow {
     display:inline-flex; align-items:center; gap:8px;
@@ -346,7 +346,7 @@
     margin-top:var(--space-2xl); display:grid;
     grid-template-columns:minmax(0,1fr) minmax(0,300px); gap:var(--space-3xl); align-items:center;
   }
-  @media (max-width:840px){ .binary-grid { grid-template-columns:1fr; gap:var(--space-xl); } }
+  @media (max-width:840px){ .binary-grid { grid-template-columns:minmax(0,1fr); gap:var(--space-xl); } }
   .binary-art { text-align:center; }
   .binary-art img { width:100%; max-width:300px; height:auto; }
   .binary-art figcaption { margin-top:var(--space-sm); font-size:0.8125rem; color:var(--slate-9); }
@@ -402,6 +402,31 @@
   details p { padding-bottom:var(--space-lg); color:var(--slate-11); font-size:0.9375rem; max-width:65ch; }
   details p code { font-family:var(--mono); font-size:0.8125em; background:var(--slate-3); border-radius:4px; padding:1px 5px; }
 
+  /* docs / reference */
+  #docs { border-top:var(--border); }
+  .docs-h { margin-top:var(--space-2xl); font-size:1.125rem; font-weight:700; letter-spacing:-0.01em; color:var(--slate-12); }
+  .docs-h code { font-family:var(--mono); font-size:0.78em; background:var(--slate-3); border-radius:4px; padding:2px 6px; font-weight:600; }
+  .docs-cmds { margin-top:var(--space-lg); display:grid; gap:var(--space-md); }
+  .doc-cmd { border:var(--border); border-radius:var(--radius-md); padding:var(--space-md) var(--space-lg); background:var(--slate-1); }
+  .doc-cmd .sig { font-family:var(--mono); font-size:0.8125rem; font-weight:600; color:var(--blue-11); }
+  .doc-cmd p { margin-top:6px; font-size:0.9375rem; color:var(--slate-11); }
+  table.doc-table { margin-top:0; }
+  table.doc-table th, table.doc-table td { text-align:left; vertical-align:top; }
+  table.doc-table td { font-family:var(--sans); font-size:0.875rem; color:var(--slate-11); }
+  table.doc-table td:first-child { font-family:var(--mono); font-size:0.8125rem; color:var(--blue-11); white-space:nowrap; }
+  table.doc-table td code, table.doc-table td b { font-family:var(--mono); font-size:0.9em; color:var(--slate-12); font-weight:400; }
+  .docs-two { margin-top:var(--space-lg); display:grid; grid-template-columns:1fr 1fr; gap:var(--space-2xl); }
+  @media (max-width:680px){ .docs-two { grid-template-columns:1fr; gap:var(--space-lg); } }
+  .exit-list, .env-list { margin-top:var(--space-sm); list-style:none; display:grid; gap:8px; }
+  .exit-list li { display:flex; gap:10px; align-items:baseline; font-size:0.9375rem; color:var(--slate-11); }
+  .exit-list code, .env-list code { font-family:var(--mono); font-size:0.8125rem; background:var(--slate-3); border-radius:4px; padding:1px 7px; color:var(--slate-12); flex:none; }
+  .env-list li { font-size:0.9375rem; color:var(--slate-11); }
+  .env-list code { background:none; padding:0; color:var(--blue-11); }
+  .docs-json { margin-top:var(--space-lg); }
+  .docs-json pre { font-size:0.72rem; }
+  .docs-json .k { color:var(--blue-11); }
+  .docs-json .dim { color:var(--slate-9); }
+
   /* footer */
   footer { border-top:var(--border); padding-block:var(--space-2xl); }
   footer .wrap { display:flex; flex-wrap:wrap; gap:var(--space-md) var(--space-2xl); align-items:center; font-size:0.875rem; color:var(--slate-10); }
@@ -430,6 +455,7 @@
       <a class="hide-sm" href="#how">How it works</a>
       <a class="hide-sm" href="#bench">Benchmarks</a>
       <a class="hide-sm" href="#binary">Binaries</a>
+      <a class="hide-sm" href="#docs">Docs</a>
       <a class="hide-sm" href="#faq">FAQ</a>
       <a href="#install">Install</a>
       <a class="gh" href="https://github.com/copyleftdev/whatthediff" aria-label="WhatTheDiff on GitHub">
@@ -446,9 +472,9 @@
       <div>
         <span class="eyebrow rise">Deterministic semantic diff · v1.6.0</span>
         <h1 class="rise">The diff that answers<br>“what actually matters?”</h1>
-        <p class="lede rise">Point <strong>wtd</strong> at a directory of configs, contracts, or JSON.
-        It finds the <strong>consensus</strong>, ranks the <strong>drift</strong>, flags the
-        <strong>outlier</strong> — and shows the evidence behind every claim.</p>
+        <p class="lede rise">Point <strong>wtd</strong> at a directory of configs, contracts, JSON — even
+        <strong>executables</strong>. It finds the <strong>consensus</strong>, ranks the <strong>drift</strong>,
+        flags the <strong>outlier</strong> — and shows the evidence behind every claim.</p>
 
         <div class="install-box rise">
           <span class="dollar" aria-hidden="true">$</span>
@@ -789,6 +815,107 @@ Corpus: 5 artifacts · 12 distinct primitives · 34 observations
     </div>
   </section>
 
+  <section id="docs" style="padding-top:0">
+    <div class="wrap">
+      <span class="kicker">Reference</span>
+      <h2>Documentation</h2>
+      <p class="sub">Everything wtd does, in one place. The deterministic engine runs the same for
+      every command — flags and subcommands only choose what to compute and how to print it.</p>
+
+      <h3 class="docs-h">Commands</h3>
+      <div class="docs-cmds">
+        <div class="doc-cmd">
+          <span class="sig">wtd &lt;path&gt;…</span>
+          <p>Analyze a corpus and print the human report — consensus, drift, conflicts, factions, and unique-primitive evidence. Directories are walked recursively; each file is routed to an extractor by extension or content sniff.</p>
+        </div>
+        <div class="doc-cmd">
+          <span class="sig">wtd ask "&lt;question&gt;" [path…]</span>
+          <p>An LLM answers your question about the corpus, grounded in the engine's evidence with file:line citations. It only ever sees engine-generated evidence — it cannot invent a finding. Works with the Anthropic API, OpenRouter, or a local OpenAI-compatible endpoint.</p>
+        </div>
+        <div class="doc-cmd">
+          <span class="sig">wtd yara &lt;path&gt;…</span>
+          <p>Emit a candidate YARA rule for each detected binary family, built from the features exclusive to its members (present in all of them, absent from every other sample). Deterministic; review before shipping.</p>
+        </div>
+      </div>
+
+      <h3 class="docs-h">Options</h3>
+      <div class="tablewrap">
+        <table class="doc-table">
+          <thead><tr><th>Flag</th><th>Effect</th></tr></thead>
+          <tbody>
+            <tr><td>--json</td><td>Machine-readable evidence graph (schema <b>wtd.report.v1</b>).</td></tr>
+            <tr><td>--evidence</td><td>With <code>--json</code>: emit every occurrence, no per-primitive cap.</td></tr>
+            <tr><td>--consensus</td><td>Print only the consensus buckets.</td></tr>
+            <tr><td>--drift</td><td>Print only the drift ranking + outliers.</td></tr>
+            <tr><td>--conflicts</td><td>Print only conflicts — the agreed value per scalar key and which files disagree.</td></tr>
+            <tr><td>--factions</td><td>Print only factions — groups deviating from consensus the same way.</td></tr>
+            <tr><td>--keys-only</td><td>Compare structure, not values: drop the value from every <code>key=value</code> primitive and hash raw lines. Secret-safe — no value reaches the report.</td></tr>
+            <tr><td>--fail-on &lt;spec&gt;</td><td>CI gate: exit <b>3</b> if the corpus violates the policy. <code>&lt;spec&gt;</code> is a comma-separated list of <code>conflicts[&gt;N]</code>, <code>outliers[&gt;N]</code>, <code>drift&gt;F</code>.</td></tr>
+            <tr><td>--dry-run</td><td><code>ask</code> only — print the exact model prompt instead of calling a model.</td></tr>
+            <tr><td>--model &lt;m&gt;</td><td><code>ask</code> only — override the model (also honors <code>WTD_AI_MODEL</code>).</td></tr>
+            <tr><td>--version / --help</td><td>Print the version, or the full usage.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="docs-two">
+        <div>
+          <h3 class="docs-h">Exit codes</h3>
+          <ul class="exit-list">
+            <li><code>0</code> success — analysis ran (and any gate passed)</li>
+            <li><code>1</code> internal error (unreadable input, etc.)</li>
+            <li><code>2</code> usage error (bad flag or spec)</li>
+            <li><code>3</code> gate failed — a <code>--fail-on</code> condition tripped</li>
+          </ul>
+        </div>
+        <div>
+          <h3 class="docs-h">Environment — <code>wtd ask</code></h3>
+          <ul class="env-list">
+            <li><code>ANTHROPIC_API_KEY</code> — use the Anthropic Messages API</li>
+            <li><code>OPENROUTER_API_KEY</code> — use OpenRouter</li>
+            <li><code>WTD_AI_URL</code> — any OpenAI-compatible endpoint (e.g. a local Ollama), no key needed</li>
+            <li><code>WTD_AI_MODEL</code> — model override</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3 class="docs-h">Supported formats</h3>
+      <div class="tablewrap">
+        <table class="doc-table">
+          <thead><tr><th>Input</th><th>Routed on</th><th>Becomes</th></tr></thead>
+          <tbody>
+            <tr><td>JSON / JSONC</td><td><code>.json</code> · sniff</td><td>key-path facts (comments &amp; trailing commas tolerated)</td></tr>
+            <tr><td>YAML</td><td><code>.yaml .yml</code></td><td>key-path facts (unify with JSON)</td></tr>
+            <tr><td>INI / env / TOML-ish</td><td><code>.ini .env .conf .toml</code></td><td>key-path facts (<code>export</code> normalized)</td></tr>
+            <tr><td>XML</td><td><code>.xml .svg .xsd .plist</code></td><td>key-path facts (attributes unify with elements)</td></tr>
+            <tr><td>CBOR</td><td><code>.cbor</code> · self-describe tag</td><td>key-path facts (unify with the JSON twin)</td></tr>
+            <tr><td>PDF</td><td><code>.pdf</code></td><td>normalized text lines (FlateDecode handled)</td></tr>
+            <tr><td>Markdown</td><td><code>.md</code></td><td>headings + text lines</td></tr>
+            <tr><td>ELF / PE / Mach-O</td><td><code>.exe .dll .so .dylib .bin</code> · binary sniff</td><td>content-defined chunks + imports/exports/sections/needs/strings</td></tr>
+            <tr><td>Any binary / firmware</td><td>binary sniff</td><td>content-defined chunks + strings</td></tr>
+            <tr><td>Plain text</td><td>fallback</td><td>normalized text lines</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="docs-h">JSON report — <code>--json</code></h3>
+      <div class="fam-term docs-json" aria-label="wtd.report.v1 JSON schema">
+        <pre>{
+  <span class="k">"schema"</span>: <span class="dim">"wtd.report.v1"</span>,
+  <span class="k">"corpus"</span>:    { artifacts, distinct_primitives, observations, skipped },
+  <span class="k">"consensus"</span>: { universal, majority, minority, unique, core_size },
+  <span class="k">"drift"</span>:     { mean, stddev },
+  <span class="k">"gate"</span>:      <span class="dim">null</span> | { failed, conditions:[{ metric, threshold, observed, tripped }] },
+  <span class="k">"conflicts"</span>: [ { key, holders, deviants, values:[{ value, count, artifacts }] } ],
+  <span class="k">"factions"</span>:  [ { size, members, member_paths, cohesion, signature:[…] } ],
+  <span class="k">"artifacts"</span>: [ { id, path, kind, size, primitives, in_core, unique, drift, outlier } ],
+  <span class="k">"evidence"</span>:  [ { identity, kind, canonical, artifacts, bucket, occurrences:[{ artifact, line }] } ]
+}</pre>
+      </div>
+      <p class="sub" style="margin-top:var(--space-md)">Every claim in the report traces to <code style="font-family:var(--mono);font-size:.85em">evidence[]</code> — identity, how many artifacts hold it, and the artifact+line of each occurrence. <code style="font-family:var(--mono);font-size:.85em">gate</code> is <code style="font-family:var(--mono);font-size:.85em">null</code> unless <code style="font-family:var(--mono);font-size:.85em">--fail-on</code> was given, so the schema is stable.</p>
+    </div>
+  </section>
+
   <section id="install">
     <div class="wrap">
       <span class="kicker">Install</span>
@@ -912,6 +1039,7 @@ copyleftdev/whatthediff/main/install.ps1 | iex</pre>
   <div class="wrap">
     <span>WhatTheDiff · deterministic by design</span>
     <nav aria-label="Footer">
+      <a href="#docs">Docs</a>
       <a href="https://github.com/copyleftdev/whatthediff">GitHub</a>
       <a href="https://github.com/copyleftdev/whatthediff/releases/latest">Releases</a>
       <a href="https://github.com/copyleftdev/whatthediff/blob/main/intent.md">Design philosophy</a>
