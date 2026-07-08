@@ -5,7 +5,7 @@
 **Traditional diff tools answer *"what changed?"* — WTD answers *"what actually matters?"***
 
 [![Zig](https://img.shields.io/badge/Zig-0.14-f7a41d?logo=zig&logoColor=white)](https://ziglang.org)
-[![Tests](https://img.shields.io/badge/tests-60%2F60-brightgreen)](#-testing)
+[![Tests](https://img.shields.io/badge/tests-64%2F64-brightgreen)](#-testing)
 [![Property iterations](https://img.shields.io/badge/property_iterations-1065-brightgreen)](#-testing)
 [![Scale](https://img.shields.io/badge/1M_files-22µs%2Ffile-blue)](#-scale)
 [![Deterministic](https://img.shields.io/badge/reports-byte--identical-8A2BE2)](#-testing)
@@ -68,6 +68,7 @@ Artifacts are never compared as raw text. Each is decomposed into
 | `kv`        | JSON, YAML-lite, XML-lite, config     | `db.port=5432`, `features[]=x` |
 | `heading`   | Markdown                         | `h2:Deployment`                |
 | `line`      | PDF text, text fallback          | normalized text line           |
+| `chunk`     | binaries / executables (SSDeep-style) | content-defined chunk hash |
 
 Each primitive's identity is `BLAKE3(kind ‖ 0x00 ‖ canonical)`.
 **The canonical form is cross-format**: `{"db":{"port":5432}}` in JSON,
@@ -156,6 +157,38 @@ Works with three kinds of providers (checked in this order):
 `--model <m>` overrides the model; `--dry-run` prints the exact prompt
 (system + evidence) without calling anything — useful for auditing what the
 model is allowed to know, and it needs no key.
+
+## 🔬 Binary & executable analysis
+
+Point wtd at a directory of executables and it does **SSDeep-class fuzzy
+analysis** — but self-explaining. Each binary is cut into *content-defined
+chunks* (the same content-triggered piecewise hashing technique inside
+SSDeep/CTPH: a rolling hash picks chunk boundaries from the bytes, so
+inserting or removing data only disturbs nearby chunks and the rest re-sync).
+Each chunk is a primitive, so the existing consensus/drift/**faction** engine
+clusters binaries by shared code — and tells you *which* chunks, at what byte
+offsets.
+
+```console
+$ wtd ./samples --factions
+Factions (groups deviating from consensus in the same way)
+  faction of 3 · cohesion 1.00
+    members: samples/mathapp-v1, samples/mathapp-v2, samples/mathapp-v3
+    shared: chunk f722a9b73035213b…  (3/3 members)
+  faction of 3 · cohesion 1.00
+    members: samples/textproc-v1, samples/textproc-v2, samples/textproc-v3
+    shared: chunk 2123887eae9ddcfe…  (3/3 members)
+```
+
+Six stripped ELF binaries, two families of three variants each — clustered
+correctly with nothing but the bytes. Unlike SSDeep's pairwise 0–100 score,
+you get family clustering, the shared-vs-unique regions as evidence, and
+`wtd ask "which binaries are variants of the same program?"`. A single
+`binary.format=elf/x86_64` primitive also groups by platform, so a lone PE
+among ELF files is an outlier before chunk analysis even matters. ELF, PE,
+Mach-O, Wasm, and JVM/ar formats are recognized; any other binary is chunked
+generically. Executable extensions (`.exe .dll .so .dylib .bin .o .wasm` …)
+route here, and extensionless files that sniff as binary do too.
 
 ## 🧪 Testing
 
@@ -246,7 +279,11 @@ Each module is independently testable and replaceable; extractors degrade
 - [x] PDF text extractor (v0.7.0: zero-dependency — FlateDecode via
   std.compress.zlib, text operators BT/Tj/TJ/quote, escapes/hex/CID filtering;
   validated against pandoc/LaTeX and ghostscript output; roundtrip property test)
-- [ ] Source-code extractors
+- [x] Binary / executable fuzzy analysis (v0.8.0: content-defined chunking —
+  the SSDeep/CTPH core — so the consensus/drift/faction engine clusters
+  binaries by shared code; validated clustering real compiled ELF variants
+  into families; format+arch detection for ELF/PE/Mach-O/Wasm)
+- [ ] Source-code extractors (semantic, beyond line-level)
 
 ## 📜 Design notes
 

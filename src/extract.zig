@@ -8,6 +8,7 @@ const json = @import("extractors/json.zig");
 const yamlish = @import("extractors/yamlish.zig");
 const xml = @import("extractors/xml.zig");
 const pdf = @import("extractors/pdf.zig");
+const binary = @import("extractors/binary.zig");
 const config = @import("extractors/config.zig");
 const markdown = @import("extractors/markdown.zig");
 const text = @import("extractors/text.zig");
@@ -33,6 +34,7 @@ pub fn extract(
             error.Unparseable => try arena.alloc(types.Primitive, 0),
             else => |e| e,
         },
+        .binary => binary.extract(arena, content),
         .config => config.extract(arena, content),
         .markdown => markdown.extract(arena, content),
         .text => blk: {

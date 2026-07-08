@@ -22,6 +22,7 @@ test {
     _ = @import("extractors/yamlish.zig");
     _ = @import("extractors/xml.zig");
     _ = @import("extractors/pdf.zig");
+    _ = @import("extractors/binary.zig");
     _ = @import("extractors/config.zig");
     _ = @import("extractors/markdown.zig");
     _ = @import("extractors/text.zig");

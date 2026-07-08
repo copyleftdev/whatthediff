@@ -49,14 +49,24 @@ pub fn run(arena: std.mem.Allocator, paths: []const []const u8) !Corpus {
             skipped += 1;
             continue;
         };
-        // PDFs are legitimately binary; the extractor handles them.
-        if (f.kind != .pdf and isBinary(content)) {
+        // Binaries are no longer skipped: an unknown-extension file that
+        // sniffs as binary is analyzed with content-defined chunking
+        // (SSDeep/CTPH-style). PDFs and declared binaries route directly.
+        var kind = f.kind;
+        if (kind == .text and isBinary(content)) kind = .binary;
+        // A file *declared* as a text format but actually binary is
+        // malformed input — skip it rather than chunk it.
+        if (kind != .pdf and kind != .binary and isBinary(content)) {
+            skipped += 1;
+            continue;
+        }
+        if (content.len == 0) {
             skipped += 1;
             continue;
         }
 
         const id: u32 = @intCast(artifacts.items.len);
-        const prims = try extract.extract(scratch, f.kind, content);
+        const prims = try extract.extract(scratch, kind, content);
 
         var set = std.ArrayList(u32).init(arena);
         for (prims) |p| {
@@ -67,7 +77,7 @@ pub fn run(arena: std.mem.Allocator, paths: []const []const u8) !Corpus {
         try artifacts.append(.{
             .id = id,
             .path = f.path,
-            .kind = f.kind,
+            .kind = kind,
             .size = content.len,
         });
         try sets.append(try set.toOwnedSlice());
@@ -107,7 +117,9 @@ test "end-to-end pipeline over a temp corpus" {
     try tmp.dir.writeFile(.{ .sub_path = "a.json", .data = "{\"port\": 80, \"tls\": true}" });
     try tmp.dir.writeFile(.{ .sub_path = "b.json", .data = "{\"tls\": true, \"port\": 80}" });
     try tmp.dir.writeFile(.{ .sub_path = "c.json", .data = "{\"port\": 9999}" });
-    try tmp.dir.writeFile(.{ .sub_path = "junk.bin", .data = "\x00\x01\x02" });
+    // Declared JSON but actually binary → malformed, skipped (a .bin file
+    // would now be chunk-analyzed as a binary instead).
+    try tmp.dir.writeFile(.{ .sub_path = "junk.json", .data = "\x00\x01\x02" });
 
     const root = try tmp.dir.realpathAlloc(arena, ".");
     const corpus = try run(arena, &.{root});

@@ -138,7 +138,11 @@ fn renderUniqueEvidence(writer: anytype, corpus: *const engine.Corpus) !void {
                 truncateUtf8(stat.canonical, canonical_display_max),
             });
             if (stat.canonical.len > canonical_display_max) try writer.print("…", .{});
-            if (occ.line > 0) try writer.print("  (line {d})", .{occ.line});
+            if (stat.kind == .chunk) {
+                try writer.print("  (offset {d})", .{occ.line});
+            } else if (occ.line > 0) {
+                try writer.print("  (line {d})", .{occ.line});
+            }
             try writer.print("\n", .{});
 
             shown += 1;

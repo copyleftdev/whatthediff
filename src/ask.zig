@@ -179,7 +179,9 @@ fn writeFocus(
         if (shown == 0) try w.print("  unique to this file:\n", .{});
         shown += 1;
         if (shown > max_unique_per_focus) continue;
-        if (occ.line > 0) {
+        if (obs.kind == .chunk) {
+            try w.print("    {s} {s} (offset {d})\n", .{ @tagName(obs.kind), clip(obs.canonical), occ.line });
+        } else if (occ.line > 0) {
             try w.print("    {s} {s} (line {d})\n", .{ @tagName(obs.kind), clip(obs.canonical), occ.line });
         } else {
             try w.print("    {s} {s}\n", .{ @tagName(obs.kind), clip(obs.canonical) });

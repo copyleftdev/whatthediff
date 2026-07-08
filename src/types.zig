@@ -14,6 +14,7 @@ pub const ArtifactKind = enum {
     yaml,
     xml,
     pdf,
+    binary,
     markdown,
     config,
     text,
@@ -37,6 +38,9 @@ pub const PrimitiveKind = enum {
     heading,
     /// A normalized (trimmed, non-empty) text line.
     line,
+    /// A content-defined chunk of a binary (SSDeep/CTPH-style); canonical is
+    /// the chunk's BLAKE3 hex, `.line` is its byte offset.
+    chunk,
 };
 
 /// The unit of comparison. Artifacts are never compared directly; they are
