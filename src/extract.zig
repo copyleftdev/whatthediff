@@ -7,6 +7,7 @@ const types = @import("types.zig");
 const json = @import("extractors/json.zig");
 const yamlish = @import("extractors/yamlish.zig");
 const xml = @import("extractors/xml.zig");
+const pdf = @import("extractors/pdf.zig");
 const config = @import("extractors/config.zig");
 const markdown = @import("extractors/markdown.zig");
 const text = @import("extractors/text.zig");
@@ -24,6 +25,12 @@ pub fn extract(
         .yaml => yamlish.extract(arena, content),
         .xml => xml.extract(arena, content) catch |err| switch (err) {
             error.Unparseable => text.extract(arena, content),
+            else => |e| e,
+        },
+        .pdf => pdf.extract(arena, content) catch |err| switch (err) {
+            // Binary junk in a .pdf: nothing extractable — never fall back to
+            // raw bytes as line primitives.
+            error.Unparseable => try arena.alloc(types.Primitive, 0),
             else => |e| e,
         },
         .config => config.extract(arena, content),

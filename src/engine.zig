@@ -49,7 +49,8 @@ pub fn run(arena: std.mem.Allocator, paths: []const []const u8) !Corpus {
             skipped += 1;
             continue;
         };
-        if (isBinary(content)) {
+        // PDFs are legitimately binary; the extractor handles them.
+        if (f.kind != .pdf and isBinary(content)) {
             skipped += 1;
             continue;
         }

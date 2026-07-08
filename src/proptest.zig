@@ -703,6 +703,94 @@ test "property: the same structure in JSON and XML yields identical identities" 
     }
 }
 
+// ---------------------------------------------- pdf roundtrip -------------
+
+const pdf_extractor = @import("extractors/pdf.zig");
+
+fn escapePdfString(arena: std.mem.Allocator, s: []const u8) ![]const u8 {
+    var out = std.ArrayList(u8).init(arena);
+    for (s) |c| {
+        switch (c) {
+            '(', ')', '\\' => {
+                try out.append('\\');
+                try out.append(c);
+            },
+            else => try out.append(c),
+        }
+    }
+    return out.toOwnedSlice();
+}
+
+test "property: text lines survive the PDF write→extract roundtrip" {
+    var iter: u64 = 0;
+    while (iter < 100) : (iter += 1) {
+        const seed = 0x5eed_000a + iter;
+        errdefer std.debug.print("\ncounterexample: pdf roundtrip property, seed=0x{x}\n", .{seed});
+
+        var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
+        defer arena_state.deinit();
+        const arena = arena_state.allocator();
+        var prng = std.Random.DefaultPrng.init(seed);
+        const rand = prng.random();
+
+        // Random document: 1..20 lines of printable text (with characters
+        // that need PDF escaping mixed in).
+        const n_lines = rand.intRangeAtMost(usize, 1, 20);
+        const lines = try arena.alloc([]const u8, n_lines);
+        const chars = "abcdefghijklmnopqrstuvwxyz0123456789 :;,.-_()\\/";
+        for (lines) |*l| {
+            const len = rand.intRangeAtMost(usize, 1, 60);
+            const buf = try arena.alloc(u8, len);
+            for (buf) |*c| c.* = chars[rand.uintLessThan(usize, chars.len)];
+            // The extractor normalizes whitespace; generate pre-normalized
+            // text (no leading/trailing/double spaces) so equality is exact.
+            l.* = try normalizeSpaces(arena, buf);
+        }
+
+        var cs = std.ArrayList(u8).init(arena);
+        try cs.appendSlice("BT /F1 12 Tf 72 720 Td ");
+        var wrote: usize = 0;
+        for (lines) |l| {
+            if (l.len == 0) continue;
+            if (wrote > 0) try cs.appendSlice("0 -14 Td ");
+            try cs.append('(');
+            try cs.appendSlice(try escapePdfString(arena, l));
+            try cs.appendSlice(") Tj ");
+            wrote += 1;
+        }
+        try cs.appendSlice("ET");
+
+        const compressed = rand.boolean();
+        const pdf = try pdf_extractor.buildTestPdf(arena, cs.items, compressed);
+        const prims = try pdf_extractor.extract(arena, pdf);
+
+        var expected: usize = 0;
+        for (lines) |l| {
+            if (l.len == 0) continue;
+            try std.testing.expect(expected < prims.len);
+            try std.testing.expectEqualStrings(l, prims[expected].canonical);
+            try std.testing.expectEqual(types.PrimitiveKind.line, prims[expected].kind);
+            expected += 1;
+        }
+        try std.testing.expectEqual(expected, prims.len);
+    }
+}
+
+fn normalizeSpaces(arena: std.mem.Allocator, raw: []const u8) ![]const u8 {
+    var out = std.ArrayList(u8).init(arena);
+    var in_ws = true;
+    for (raw) |c| {
+        if (c == ' ') {
+            in_ws = true;
+        } else {
+            if (in_ws and out.items.len > 0) try out.append(' ');
+            in_ws = false;
+            try out.append(c);
+        }
+    }
+    return out.toOwnedSlice();
+}
+
 // ------------------------------------------------- faction recovery -------
 
 const cluster = @import("cluster.zig");

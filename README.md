@@ -5,8 +5,8 @@
 **Traditional diff tools answer *"what changed?"* — WTD answers *"what actually matters?"***
 
 [![Zig](https://img.shields.io/badge/Zig-0.14-f7a41d?logo=zig&logoColor=white)](https://ziglang.org)
-[![Tests](https://img.shields.io/badge/tests-54%2F54-brightgreen)](#-testing)
-[![Property iterations](https://img.shields.io/badge/property_iterations-965-brightgreen)](#-testing)
+[![Tests](https://img.shields.io/badge/tests-60%2F60-brightgreen)](#-testing)
+[![Property iterations](https://img.shields.io/badge/property_iterations-1065-brightgreen)](#-testing)
 [![Scale](https://img.shields.io/badge/1M_files-22µs%2Ffile-blue)](#-scale)
 [![Deterministic](https://img.shields.io/badge/reports-byte--identical-8A2BE2)](#-testing)
 [![Dependencies](https://img.shields.io/badge/dependencies-0-lightgrey)](#-architecture)
@@ -67,7 +67,7 @@ Artifacts are never compared as raw text. Each is decomposed into
 |-------------|---------------------------------------|--------------------------------|
 | `kv`        | JSON, YAML-lite, XML-lite, config     | `db.port=5432`, `features[]=x` |
 | `heading`   | Markdown                         | `h2:Deployment`                |
-| `line`      | text fallback                    | trimmed line                   |
+| `line`      | PDF text, text fallback          | normalized text line           |
 
 Each primitive's identity is `BLAKE3(kind ‖ 0x00 ‖ canonical)`.
 **The canonical form is cross-format**: `{"db":{"port":5432}}` in JSON,
@@ -243,7 +243,10 @@ Each module is independently testable and replaceable; extractors degrade
   3.8 GB RSS, detection still exact)
 - [x] XML extractor (v0.6.0: XML-lite with entities/CDATA/DOCTYPE; attributes
   unify with child elements; property-tested against JSON on random structures)
-- [ ] PDF and source-code extractors
+- [x] PDF text extractor (v0.7.0: zero-dependency — FlateDecode via
+  std.compress.zlib, text operators BT/Tj/TJ/quote, escapes/hex/CID filtering;
+  validated against pandoc/LaTeX and ghostscript output; roundtrip property test)
+- [ ] Source-code extractors
 
 ## 📜 Design notes
 
