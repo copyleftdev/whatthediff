@@ -37,6 +37,7 @@ test {
     _ = @import("proptest.zig");
     _ = @import("cluster.zig");
     _ = @import("conflicts.zig");
+    _ = @import("creds.zig");
     _ = @import("gate.zig");
     _ = @import("yara.zig");
     _ = @import("kit.zig");

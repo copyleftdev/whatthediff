@@ -22,13 +22,14 @@ const std = @import("std");
 
 pub const exit_code: u8 = 3;
 
-pub const Metric = enum { conflicts, outliers, drift };
+pub const Metric = enum { conflicts, outliers, drift, credential_forms };
 
 /// The corpus facts a gate can assert against.
 pub const Metrics = struct {
     conflicts: u64,
     outliers: u64,
     max_drift: f64,
+    credential_forms: u64 = 0,
 };
 
 pub const Condition = struct {
@@ -60,7 +61,7 @@ pub const ParseError = error{
 pub fn describeError(e: ParseError) []const u8 {
     return switch (e) {
         error.EmptySpec => "empty condition",
-        error.UnknownMetric => "unknown metric (expected conflicts, outliers, or drift)",
+        error.UnknownMetric => "unknown metric (expected conflicts, outliers, drift, or credential-forms)",
         error.MissingThreshold => "drift requires a threshold, e.g. drift>0.5",
         error.BadThreshold => "threshold must be a number >= 0",
         error.OutOfMemory => "out of memory",
@@ -90,11 +91,13 @@ pub fn parse(arena: std.mem.Allocator, spec: []const u8) ParseError![]Condition 
             .outliers
         else if (std.mem.eql(u8, metric_str, "drift"))
             .drift
+        else if (std.mem.eql(u8, metric_str, "credential-forms"))
+            .credential_forms
         else
             return error.UnknownMetric;
 
         const th = threshold orelse switch (metric) {
-            .conflicts, .outliers => @as(f64, 0),
+            .conflicts, .outliers, .credential_forms => @as(f64, 0),
             .drift => return error.MissingThreshold,
         };
 
@@ -109,6 +112,7 @@ fn observed(metric: Metric, m: Metrics) f64 {
         .conflicts => @floatFromInt(m.conflicts),
         .outliers => @floatFromInt(m.outliers),
         .drift => m.max_drift,
+        .credential_forms => @floatFromInt(m.credential_forms),
     };
 }
 
@@ -129,6 +133,7 @@ pub fn metricName(metric: Metric) []const u8 {
         .conflicts => "conflicts",
         .outliers => "outliers",
         .drift => "drift",
+        .credential_forms => "credential-forms",
     };
 }
 

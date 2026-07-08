@@ -62,6 +62,12 @@ Key facts:
   (the web analog of `wtd yara`); every atom's witness set equals the member
   set exactly, so it matches the whole family and nothing else in the corpus.
   Text and `wtd.kit.v1` JSON output.
+- Credential-form flag (per page, no clustering needed): wtd flags any page whose
+  form collects a password or >=2 sensitive fields (card, cvv, ssn, otp, seed/
+  mnemonic), and marks posting off-domain as an exfiltration signal. This catches
+  one-off phishing harvesters that never cluster into a kit family. Shows in the
+  report and `--json` (credential_forms[]); `wtd kit` lists the un-clustered ones;
+  `--fail-on credential-forms` gates it in CI (brand monitoring).
 - Candidate YARA rules (`wtd yara <dir>`): turns each detected binary family
   into a detection rule. For every faction it computes the discriminative core —
   features present in every member and absent from every other sample in the

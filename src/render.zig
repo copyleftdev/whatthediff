@@ -8,6 +8,7 @@ const hash = @import("hash.zig");
 const engine = @import("engine.zig");
 const analysis = @import("analysis.zig");
 const conflicts_mod = @import("conflicts.zig");
+const creds_mod = @import("creds.zig");
 const gate_mod = @import("gate.zig");
 
 pub const Section = enum { all, consensus, drift, factions, conflicts };
@@ -55,6 +56,8 @@ pub fn renderText(writer: anytype, corpus: *const engine.Corpus, opts: Options) 
     if (opts.section == .all or opts.section == .drift) {
         try renderUniqueEvidence(writer, corpus);
     }
+    // Silent for non-web corpora (no credential forms detected).
+    if (opts.section == .all) try creds_mod.render(writer, corpus.credential_forms);
     if (opts.gate) |g| try renderGate(writer, g);
 }
 
@@ -361,6 +364,7 @@ const JsonReport = struct {
     drift: struct { mean: f64, stddev: f64 },
     /// Null unless --fail-on was given; present so CI can read the verdict.
     gate: ?JsonGate,
+    credential_forms: []creds_mod.JsonForm,
     conflicts: []JsonConflict,
     factions: []JsonFaction,
     artifacts: []JsonArtifact,
@@ -467,6 +471,7 @@ pub fn renderJson(
         },
         .drift = .{ .mean = a.mean_drift, .stddev = a.std_drift },
         .gate = gate_out,
+        .credential_forms = try creds_mod.toJson(arena, corpus.credential_forms),
         .conflicts = conflicts_out,
         .factions = factions_out,
         .artifacts = artifacts,

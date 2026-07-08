@@ -4,9 +4,9 @@
 
 **Traditional diff tools answer *"what changed?"* — WTD answers *"what actually matters?"***
 
-[![Version](https://img.shields.io/badge/version-1.10.0-0090ff)](https://github.com/copyleftdev/whatthediff/releases/latest)
+[![Version](https://img.shields.io/badge/version-1.11.0-0090ff)](https://github.com/copyleftdev/whatthediff/releases/latest)
 [![Zig](https://img.shields.io/badge/Zig-0.14-f7a41d?logo=zig&logoColor=white)](https://ziglang.org)
-[![Tests](https://img.shields.io/badge/tests-106%2F106-brightgreen)](#-testing)
+[![Tests](https://img.shields.io/badge/tests-108%2F108-brightgreen)](#-testing)
 [![Property iterations](https://img.shields.io/badge/property_iterations-1915-brightgreen)](#-testing)
 [![Scale](https://img.shields.io/badge/1M_files-22µs%2Ffile-blue)](#-scale)
 [![Deterministic](https://img.shields.io/badge/reports-byte--identical-8A2BE2)](#-testing)
@@ -117,7 +117,7 @@ curl -fsSL https://raw.githubusercontent.com/copyleftdev/whatthediff/main/instal
 irm https://raw.githubusercontent.com/copyleftdev/whatthediff/main/install.ps1 | iex
 ```
 
-Pin a version with `WTD_VERSION=v1.10.0`, choose a directory with
+Pin a version with `WTD_VERSION=v1.11.0`, choose a directory with
 `WTD_INSTALL_DIR`. Or grab a binary yourself from
 [Releases](../../releases) — static, zero-install, for Linux
 (x86_64/aarch64, fully static musl), macOS (Intel/Apple Silicon), and
@@ -146,6 +146,7 @@ scripts/release.sh                  # test + package dist/*.tar.gz|zip + SHA256S
 | `wtd ./pages --factions` | cluster captured web pages — find the shared phishing kit |
 | `wtd web <url>… [--timeout s] [--snapshot-dir d]` | fetch pages and cluster them; bounded, reproducible |
 | `wtd kit ./pages` | kit signature per web family (fields, action host, resources) |
+| `wtd ./pages --fail-on credential-forms` | flag/gate pages harvesting credentials (per-page) |
 
 > **Secret-safe schema comparison.** `--keys-only` drops the value from every
 > `key=value` primitive (`db.port=5432` → `db.port`) and hashes structureless
@@ -208,6 +209,7 @@ The spec is a comma-separated list of conditions — a bare count means "> 0":
 | `conflicts` / `conflicts>N` | any conflicting key / more than N |
 | `outliers` / `outliers>N` | any drift outlier / more than N |
 | `drift>F` | any artifact's drift exceeds `F` (0–1) |
+| `credential-forms` / `>N` | any page harvests credentials / more than N |
 
 e.g. `--fail-on 'conflicts,drift>0.5'`. **Exit codes:** `0` ok · `1` error ·
 `2` usage · `3` gate failed. The verdict is in `--json` too (a `gate` object,
@@ -399,6 +401,28 @@ with only shared structure (and no fields/action/resource) is labelled a
 drop it into a SOC pipeline. Rebranded deployments still cluster because the
 signature is the kit's *function*, not its branding.
 
+### Credential-form flag — per page, no clustering needed
+
+Kit signatures need a *family* (≥2 deployments). Real feeds are full of
+**one-off harvesters** — a lone login page on a throwaway domain — that never
+cluster. wtd flags each of those on its own: any page whose form collects a
+password (or ≥2 sensitive fields — card, cvv, ssn, otp, seed/mnemonic for
+wallet phishing) is reported, and posting **off-domain** is marked as an
+exfiltration signal:
+
+```console
+$ wtd web https://lure.example/signin        # or: wtd ./captured-pages
+Credential forms (1 page harvesting credentials)
+  https://lure.example/signin
+    harvests: password, username   posts to: collect.attacker.example  ⚠ OFF-DOMAIN
+```
+
+It shows in the report and `--json` (`credential_forms[]`), `wtd kit` lists the
+un-clustered ones after its family signatures, and **`--fail-on
+credential-forms`** turns it into a CI gate — brand monitoring that fails the
+moment a watched page sprouts a login form posting to someone else's host.
+(Benign pages stay silent — a search box or a lone newsletter email never flag.)
+
 ### `wtd yara` — turn a family into a detection rule
 
 Clustering tells you *these are related*. The next step an analyst needs is
@@ -561,6 +585,9 @@ original spec (SSDeep-class binary analysis, secret-safe schema comparison).
 - [x] DOM kit signatures (v1.9.0: `wtd kit` emits a per-family descriptor —
   harvested fields, action host, resources, skeleton — the web analog of
   `wtd yara`; text + `wtd.kit.v1` JSON)
+- [x] `wtd web` per-request timeout (v1.10.0) + credential-form flag (v1.11.0:
+  per-page harvest detection with off-domain exfil, `--fail-on credential-forms`
+  gate — catches the one-off harvesters that never cluster into a kit)
 
 *Still ideas:* semantic source-code extractors, pairwise similarity matrix
 export, a `wtd triage` recipe for sample sets.

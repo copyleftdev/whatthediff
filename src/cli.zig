@@ -8,10 +8,11 @@ const ask = @import("ask.zig");
 const gate = @import("gate.zig");
 const yara = @import("yara.zig");
 const kit = @import("kit.zig");
+const creds = @import("creds.zig");
 const binary = @import("extractors/binary.zig");
 const fetch = @import("fetch.zig");
 
-pub const version = "1.10.0";
+pub const version = "1.11.0";
 
 const usage =
     \\wtd — WhatTheDiff: what actually matters across N artifacts
@@ -39,7 +40,7 @@ const usage =
     \\                credential/.env profiles to find schema drift safely.
     \\  --fail-on <s> CI gate: exit 3 if the corpus violates the policy. <s> is a
     \\                comma-separated list of conditions:
-    \\                  conflicts[>N]  outliers[>N]  drift>F
+    \\                  conflicts[>N]  outliers[>N]  drift>F  credential-forms[>N]
     \\                A bare count condition means "> 0". Examples:
     \\                  --fail-on conflicts        --fail-on 'outliers,drift>0.5'
     \\  --version     Print version
@@ -162,6 +163,7 @@ pub fn run(arena: std.mem.Allocator, args: []const []const u8) !u8 {
             .conflicts = @intCast(corpus.conflicts.items.len),
             .outliers = n_outliers,
             .max_drift = max_drift,
+            .credential_forms = @intCast(corpus.credential_forms.len),
         };
         gate_report = try gate.evaluate(arena, metrics, conds);
         opts.gate = &gate_report;
@@ -184,6 +186,20 @@ pub fn run(arena: std.mem.Allocator, args: []const []const u8) !u8 {
         if (g.failed) return gate.exit_code;
     }
     return 0;
+}
+
+/// Credential forms whose page is not a member of any detected family.
+fn ungroupedCredForms(arena: std.mem.Allocator, corpus: *const engine.Corpus) ![]creds.CredentialForm {
+    const in_family = try arena.alloc(bool, corpus.artifacts.len);
+    @memset(in_family, false);
+    for (corpus.clusters.factions) |f| {
+        for (f.members) |m| in_family[m] = true;
+    }
+    var out = std.ArrayList(creds.CredentialForm).init(arena);
+    for (corpus.credential_forms) |cf| {
+        if (!in_family[cf.id]) try out.append(cf);
+    }
+    return out.toOwnedSlice();
 }
 
 fn runKit(arena: std.mem.Allocator, args: []const []const u8) !u8 {
@@ -221,6 +237,9 @@ fn runKit(arena: std.mem.Allocator, args: []const []const u8) !u8 {
         try kit.renderJson(arena, buffered.writer(), sigs);
     } else {
         try kit.render(buffered.writer(), sigs);
+        // Credential harvesters that don't cluster into a family — the one-off
+        // pages a kit signature (which needs ≥2 members) structurally misses.
+        try creds.render(buffered.writer(), try ungroupedCredForms(arena, &corpus));
     }
     try buffered.flush();
     return 0;

@@ -354,6 +354,7 @@ fn testCorpus(arena: std.mem.Allocator) !engine.Corpus {
         .analysis = result,
         .clusters = clusters,
         .conflicts = conflict_report,
+        .credential_forms = &.{},
         .skipped = 0,
     };
 }

@@ -10,6 +10,7 @@ const evidence = @import("evidence.zig");
 const analysis = @import("analysis.zig");
 const cluster = @import("cluster.zig");
 const conflicts = @import("conflicts.zig");
+const creds = @import("creds.zig");
 
 pub const max_artifact_bytes: usize = 64 * 1024 * 1024;
 
@@ -24,6 +25,8 @@ pub const Corpus = struct {
     clusters: cluster.Clusters,
     /// Value conflicts: scalar keys the fleet disagrees on.
     conflicts: conflicts.Conflicts,
+    /// Per-page credential-harvest forms (web/phishing triage).
+    credential_forms: []creds.CredentialForm,
     /// Files skipped as binary, oversized, or unreadable.
     skipped: u32,
 };
@@ -123,6 +126,7 @@ fn finalize(
     const result = try analysis.analyze(arena, store, artifacts.items.len, sets.items);
     const clusters = try cluster.detect(arena, store, &result, sets.items);
     const conflict_report = try conflicts.detect(arena, store, artifacts.items.len);
+    const cred_forms = try creds.detect(arena, store, artifacts.items, sets.items);
     return .{
         .artifacts = try artifacts.toOwnedSlice(),
         .store = store.*,
@@ -130,6 +134,7 @@ fn finalize(
         .analysis = result,
         .clusters = clusters,
         .conflicts = conflict_report,
+        .credential_forms = cred_forms,
         .skipped = skipped,
     };
 }

@@ -402,6 +402,7 @@ fn gateObserved(metric: gate_mod.Metric, m: gate_mod.Metrics) f64 {
         .conflicts => @floatFromInt(m.conflicts),
         .outliers => @floatFromInt(m.outliers),
         .drift => m.max_drift,
+        .credential_forms => @floatFromInt(m.credential_forms),
     };
 }
 

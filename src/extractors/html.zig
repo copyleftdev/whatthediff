@@ -59,6 +59,7 @@ const Counts = struct {
     field: usize = 0,
     formfields: usize = 0,
     formaction: usize = 0,
+    formhost: usize = 0,
     resource: usize = 0,
     path: usize = 0,
     meta: usize = 0,
@@ -242,6 +243,9 @@ const Parser = struct {
         if (std.mem.eql(u8, lname, "form")) {
             if (getAttr(attrs, "action")) |a| {
                 if (try actionValue(self.arena, a)) |v| try self.emit("formaction", v, &self.counts.formaction);
+                // An absolute action posts to an explicit host — record it so a
+                // credential form's off-domain exfiltration can be detected.
+                if (urlHost(self.arena, a)) |h| try self.emit("formhost", h, &self.counts.formhost);
             }
             return;
         }
