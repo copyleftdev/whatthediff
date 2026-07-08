@@ -41,6 +41,10 @@ Usage:
 - `wtd <dir>` — human report (consensus, drift ranking, outlier evidence)
 - `wtd <dir> --drift` / `--consensus` — single sections
 - `wtd <dir> --json [--evidence]` — machine-readable evidence graph
+- `wtd <dir> --keys-only` — compare files by structure, not values (drops the
+  value from key=value primitives, hashes raw lines). Secret-safe: point it at
+  credential/.env profiles to find schema drift without exposing any value.
+  Shell `export KEY=val` is normalized to `KEY`.
 - `wtd ask "why is X different?" <dir>` — an LLM explains the deterministic
   evidence with file:line citations; works with the Anthropic API
   (ANTHROPIC_API_KEY), OpenRouter (OPENROUTER_API_KEY), or any local

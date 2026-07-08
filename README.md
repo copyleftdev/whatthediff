@@ -129,9 +129,18 @@ scripts/release.sh                  # test + package dist/*.tar.gz|zip + SHA256S
 | `wtd configs/ --drift` | drift ranking only |
 | `wtd configs/ --consensus` | consensus buckets only |
 | `wtd configs/ --factions` | groups deviating from consensus together |
+| `wtd creds/ --keys-only` | compare structure not values — secret-safe schema drift |
 | `wtd configs/ --json` | machine-readable evidence graph (`wtd.report.v1`) |
 | `wtd configs/ --json --evidence` | uncapped occurrence lists |
 | `wtd ask "<question>" configs/` | AI explains the evidence (see below) |
+
+> **Secret-safe schema comparison.** `--keys-only` drops the value from every
+> `key=value` primitive (`db.port=5432` → `db.port`) and hashes structureless
+> lines, so no secret ever enters the report — point it straight at
+> `~/.creds`, `.env` files across environments, or any credential profiles to
+> find *schema* drift ("which env is missing a key?", "which profiles share an
+> auth shape?") without exposing a single value. Shell `export KEY=…` is
+> normalized to `KEY` so it matches bare declarations.
 
 ## 🤖 wtd ask
 

@@ -25,7 +25,43 @@ pub const Corpus = struct {
     skipped: u32,
 };
 
+pub const RunOptions = struct {
+    /// Keys-only mode: for `kv` primitives, drop the value and keep only the
+    /// key path (`db.port=5432` → `db.port`). Files are then compared by
+    /// structure, not content — ideal for credential/env profiles, where it
+    /// is also secret-safe by construction: no value ever enters the store,
+    /// report, or JSON output.
+    keys_only: bool = false,
+};
+
 pub fn run(arena: std.mem.Allocator, paths: []const []const u8) !Corpus {
+    return runOpts(arena, paths, .{});
+}
+
+/// The key path of a `kv` canonical: everything before the first `=`.
+fn keyOf(canonical: []const u8) []const u8 {
+    const eq = std.mem.indexOfScalar(u8, canonical, '=') orelse return canonical;
+    return canonical[0..eq];
+}
+
+/// Keys-only sanitizer. `kv` keeps its key path; `line` (structureless text,
+/// e.g. a raw key/token file with no `=`) is replaced by a short hash so
+/// identical lines still cluster but the content is never exposed. Other
+/// kinds (`heading`, `chunk`) carry no secret value and pass through.
+fn sanitizeCanonical(scratch: std.mem.Allocator, prim: types.Primitive) ![]const u8 {
+    switch (prim.kind) {
+        .kv => return keyOf(prim.canonical),
+        .line => {
+            var digest: [32]u8 = undefined;
+            std.crypto.hash.Blake3.hash(prim.canonical, &digest, .{});
+            const hex = std.fmt.bytesToHex(digest[0..6], .lower);
+            return std.mem.concat(scratch, u8, &.{ "line#", &hex });
+        },
+        else => return prim.canonical,
+    }
+}
+
+pub fn runOpts(arena: std.mem.Allocator, paths: []const []const u8, opts: RunOptions) !Corpus {
     const files = try discovery.discover(arena, paths);
 
     var artifacts = std.ArrayList(types.Artifact).init(arena);
@@ -70,7 +106,9 @@ pub fn run(arena: std.mem.Allocator, paths: []const []const u8) !Corpus {
 
         var set = std.ArrayList(u32).init(arena);
         for (prims) |p| {
-            const r = try store.add(id, p);
+            var prim = p;
+            if (opts.keys_only) prim.canonical = try sanitizeCanonical(scratch, prim);
+            const r = try store.add(id, prim);
             if (r.first_for_artifact) try set.append(r.index);
         }
 
@@ -137,4 +175,61 @@ test "end-to-end pipeline over a temp corpus" {
     try std.testing.expectEqual(@as(usize, 2), a.core_size);
     try std.testing.expectEqual(@as(usize, 1), a.bucket_counts[@intFromEnum(analysis.Bucket.unique)]);
     try std.testing.expect(a.artifact_stats[2].drift > a.artifact_stats[0].drift);
+}
+
+test "keys-only mode compares structure, not values" {
+    var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+
+    // Same key schema, different secret values.
+    try tmp.dir.writeFile(.{ .sub_path = "a.env", .data = "HOST=alpha\nPORT=1\nTOKEN=aaa\n" });
+    try tmp.dir.writeFile(.{ .sub_path = "b.env", .data = "HOST=beta\nPORT=2\nTOKEN=bbb\n" });
+    // A third profile missing one key and adding another.
+    try tmp.dir.writeFile(.{ .sub_path = "c.env", .data = "HOST=gamma\nPORT=3\nEXTRA=zzz\n" });
+
+    const root = try tmp.dir.realpathAlloc(arena, ".");
+
+    // Value mode: every key=value differs (except none) → no consensus core.
+    const cv = try run(arena, &.{root});
+    try std.testing.expectEqual(@as(usize, 0), cv.analysis.core_size);
+
+    // Keys-only: HOST and PORT are in all three (universal); TOKEN in 2 of 3
+    // (majority); EXTRA in 1 (unique). No values anywhere.
+    const ck = try runOpts(arena, &.{root}, .{ .keys_only = true });
+    try std.testing.expectEqual(@as(usize, 4), ck.analysis.n_identities);
+    try std.testing.expectEqual(@as(usize, 2), ck.analysis.bucket_counts[0]); // universal: HOST, PORT
+    try std.testing.expectEqual(@as(usize, 1), ck.analysis.bucket_counts[1]); // majority: TOKEN
+    try std.testing.expectEqual(@as(usize, 1), ck.analysis.bucket_counts[3]); // unique: EXTRA
+    // No canonical contains a value character sequence like "alpha".
+    for (ck.analysis.identity_stats) |s| {
+        try std.testing.expect(std.mem.indexOf(u8, s.canonical, "=") == null);
+        try std.testing.expect(std.mem.indexOf(u8, s.canonical, "alpha") == null);
+    }
+}
+
+test "keys-only hashes structureless secret lines instead of exposing them" {
+    var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+
+    // Raw key material with no key=value structure (would be a `line`).
+    try tmp.dir.writeFile(.{ .sub_path = "a.txt", .data = "SUPERSECRETKEYMATERIAL_abc123\n" });
+    try tmp.dir.writeFile(.{ .sub_path = "b.txt", .data = "SUPERSECRETKEYMATERIAL_abc123\n" });
+    const root = try tmp.dir.realpathAlloc(arena, ".");
+
+    const ck = try runOpts(arena, &.{root}, .{ .keys_only = true });
+    // Identical secret lines still cluster (one universal identity)...
+    try std.testing.expectEqual(@as(usize, 1), ck.analysis.n_identities);
+    // ...but the secret content never appears in any canonical.
+    for (ck.analysis.identity_stats) |s| {
+        try std.testing.expect(std.mem.indexOf(u8, s.canonical, "SUPERSECRET") == null);
+        try std.testing.expect(std.mem.startsWith(u8, s.canonical, "line#"));
+    }
 }

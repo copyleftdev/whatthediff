@@ -31,7 +31,12 @@ pub fn extract(arena: std.mem.Allocator, content: []const u8) ![]types.Primitive
             continue;
         };
 
-        const key = std.mem.trim(u8, t[0..sep], " \t");
+        var key = std.mem.trim(u8, t[0..sep], " \t");
+        // Normalize shell-style `export KEY=value` so it matches a bare
+        // `KEY=value` in another profile.
+        if (std.mem.startsWith(u8, key, "export ")) {
+            key = std.mem.trim(u8, key["export ".len..], " \t");
+        }
         const value = std.mem.trim(u8, t[sep + 1 ..], " \t\"'");
         if (key.len == 0) continue;
 
@@ -71,4 +76,15 @@ test "config kv with sections, comments, and quotes" {
     try std.testing.expectEqualStrings("db.port=5432", prims[2].canonical);
     try std.testing.expectEqual(@as(u32, 2), prims[0].line);
     try std.testing.expectEqual(types.PrimitiveKind.kv, prims[0].kind);
+}
+
+test "export prefix is normalized away" {
+    var arena_state = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+
+    const prims = try extract(arena, "export FOO=bar\nBAZ=qux\n");
+    try std.testing.expectEqual(@as(usize, 2), prims.len);
+    try std.testing.expectEqualStrings("FOO=bar", prims[0].canonical);
+    try std.testing.expectEqualStrings("BAZ=qux", prims[1].canonical);
 }

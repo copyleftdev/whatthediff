@@ -6,7 +6,7 @@ const engine = @import("engine.zig");
 const render = @import("render.zig");
 const ask = @import("ask.zig");
 
-pub const version = "0.8.0";
+pub const version = "0.9.0";
 
 const usage =
     \\wtd — WhatTheDiff: what actually matters across N artifacts
@@ -45,6 +45,7 @@ pub fn run(arena: std.mem.Allocator, args: []const []const u8) !u8 {
     var paths = std.ArrayList([]const u8).init(arena);
     var opts = render.Options{};
     var as_json = false;
+    var keys_only = false;
 
     for (args) |arg| {
         if (std.mem.eql(u8, arg, "--help") or std.mem.eql(u8, arg, "-h")) {
@@ -63,6 +64,8 @@ pub fn run(arena: std.mem.Allocator, args: []const []const u8) !u8 {
             opts.section = .drift;
         } else if (std.mem.eql(u8, arg, "--factions")) {
             opts.section = .factions;
+        } else if (std.mem.eql(u8, arg, "--keys-only")) {
+            keys_only = true;
         } else if (std.mem.startsWith(u8, arg, "-")) {
             try std.io.getStdErr().writer().print("wtd: unknown option '{s}'\n\n{s}", .{ arg, usage });
             return 2;
@@ -76,7 +79,7 @@ pub fn run(arena: std.mem.Allocator, args: []const []const u8) !u8 {
         return 2;
     }
 
-    const corpus = engine.run(arena, paths.items) catch |err| {
+    const corpus = engine.runOpts(arena, paths.items, .{ .keys_only = keys_only }) catch |err| {
         try std.io.getStdErr().writer().print("wtd: error: {s}\n", .{@errorName(err)});
         return 1;
     };
@@ -101,6 +104,7 @@ fn runAsk(arena: std.mem.Allocator, args: []const []const u8) !u8 {
     var question: ?[]const u8 = null;
     var paths = std.ArrayList([]const u8).init(arena);
     var opts = ask.Options{};
+    var keys_only = false;
 
     var i: usize = 0;
     while (i < args.len) : (i += 1) {
@@ -114,6 +118,8 @@ fn runAsk(arena: std.mem.Allocator, args: []const []const u8) !u8 {
                 return 2;
             }
             opts.model = args[i];
+        } else if (std.mem.eql(u8, arg, "--keys-only")) {
+            keys_only = true;
         } else if (std.mem.startsWith(u8, arg, "-")) {
             try std.io.getStdErr().writer().print("wtd: unknown ask option '{s}'\n\n{s}", .{ arg, usage });
             return 2;
@@ -130,7 +136,7 @@ fn runAsk(arena: std.mem.Allocator, args: []const []const u8) !u8 {
     };
     if (paths.items.len == 0) try paths.append(".");
 
-    const corpus = engine.run(arena, paths.items) catch |err| {
+    const corpus = engine.runOpts(arena, paths.items, .{ .keys_only = keys_only }) catch |err| {
         try std.io.getStdErr().writer().print("wtd: error: {s}\n", .{@errorName(err)});
         return 1;
     };

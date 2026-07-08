@@ -37,7 +37,7 @@
       "alternateName": "wtd",
       "applicationCategory": "DeveloperApplication",
       "operatingSystem": "Linux, macOS, Windows",
-      "softwareVersion": "0.8.0",
+      "softwareVersion": "0.9.0",
       "description": "Deterministic semantic diff for N artifacts: compares many files at once — configs, JSON, YAML, XML, PDF, and even executables via SSDeep-class content-defined chunking — to find consensus, drift, outliers and variant families, backing every claim with inspectable evidence. The deterministic engine is the source of truth; an AI only explains what the engine proved.",
       "url": "https://copyleftdev.github.io/whatthediff/",
       "downloadUrl": "https://github.com/copyleftdev/whatthediff/releases/latest",
@@ -81,6 +81,11 @@
           "@type": "Question",
           "name": "How do I install WhatTheDiff?",
           "acceptedAnswer": { "@type": "Answer", "text": "One line on Linux, macOS or Git Bash: curl -fsSL https://raw.githubusercontent.com/copyleftdev/whatthediff/main/install.sh | sh — or on Windows PowerShell: irm https://raw.githubusercontent.com/copyleftdev/whatthediff/main/install.ps1 | iex. Both verify the SHA256 checksum before installing. Static binaries for six platforms are also on the GitHub Releases page." }
+        },
+        {
+          "@type": "Question",
+          "name": "Can WhatTheDiff compare credential or .env profiles safely?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. The --keys-only flag compares files by structure instead of content: it drops the value from every key=value primitive (db.port=5432 becomes db.port) and hashes structureless lines, so no secret ever enters the report or JSON output. Point it at a folder of .env files or credential profiles to find schema drift — which environment is missing a key, which profiles share an auth shape — without exposing a single value. Shell-style export KEY=value is normalized to KEY so it matches bare declarations." }
         },
         {
           "@type": "Question",
@@ -730,6 +735,16 @@ copyleftdev/whatthediff/main/install.ps1 | iex</pre>
           A file's drift is 1 − Jaccard(its primitives, core); anything past mean + 1.5σ is
           flagged. In benchmarks with planted rogues, detection is exact at every corpus size
           — 4,000 of 4,000 found at 200k files, zero false positives.</p>
+        </details>
+        <details>
+          <summary>Can it compare credential or <code style="font-family:var(--mono);font-size:.9em;background:none;padding:0">.env</code> profiles safely?</summary>
+          <p>Yes — <span style="font-family:var(--mono);font-size:.9em">--keys-only</span> compares by
+          <em>structure</em>, not content: it drops the value from every <code style="font-family:var(--mono);font-size:.85em">key=value</code>
+          primitive and hashes raw lines, so no secret enters the report. Point it at a folder of
+          <code style="font-family:var(--mono);font-size:.85em">.env</code> files to find schema drift —
+          which environment is missing a key, which profiles share an auth shape — without exposing a
+          single value. Shell <code style="font-family:var(--mono);font-size:.85em">export KEY=…</code> is
+          normalized to <code style="font-family:var(--mono);font-size:.85em">KEY</code>.</p>
         </details>
         <details>
           <summary>Can it compare binaries or executables?</summary>
