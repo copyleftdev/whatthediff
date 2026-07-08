@@ -4,9 +4,9 @@
 
 **Traditional diff tools answer *"what changed?"* — WTD answers *"what actually matters?"***
 
-[![Version](https://img.shields.io/badge/version-1.0.1-0090ff)](https://github.com/copyleftdev/whatthediff/releases/latest)
+[![Version](https://img.shields.io/badge/version-1.1.0-0090ff)](https://github.com/copyleftdev/whatthediff/releases/latest)
 [![Zig](https://img.shields.io/badge/Zig-0.14-f7a41d?logo=zig&logoColor=white)](https://ziglang.org)
-[![Tests](https://img.shields.io/badge/tests-67%2F67-brightgreen)](#-testing)
+[![Tests](https://img.shields.io/badge/tests-70%2F70-brightgreen)](#-testing)
 [![Property iterations](https://img.shields.io/badge/property_iterations-1065-brightgreen)](#-testing)
 [![Scale](https://img.shields.io/badge/1M_files-22µs%2Ffile-blue)](#-scale)
 [![Deterministic](https://img.shields.io/badge/reports-byte--identical-8A2BE2)](#-testing)
@@ -79,7 +79,9 @@ Each primitive's identity is `BLAKE3(kind ‖ 0x00 ‖ canonical)`.
 corpus finds real consensus instead of splitting into format factions. XML
 attributes unify with child elements (attribute-vs-element is syntax, not
 meaning). Lists are index-less (`features[]=x`), so reordering a list is
-not drift. Every identity keeps its full occurrence
+not drift. JSON parsing is **JSONC-tolerant** — comments and trailing commas
+are handled, so `tsconfig.json`, VS Code `settings.json`, and `devcontainer.json`
+parse semantically instead of degrading to line comparison. Every identity keeps its full occurrence
 list (artifact + line): nothing is claimed without inspectable evidence.
 
 With N artifacts and a primitive present in k of them:
