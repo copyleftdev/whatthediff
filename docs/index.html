@@ -348,6 +348,12 @@
   .fam-term .fa { color:var(--grass-11); }
   .fam-term .fb { color:var(--iris-11); }
   .fam-term .dim { color:var(--slate-9); }
+  .keys-only-block { margin-top:var(--space-3xl); border-top:var(--border); padding-top:var(--space-2xl); }
+  .keys-only-block h3 { font-size:1.125rem; font-weight:700; letter-spacing:-0.01em; }
+  .keys-only-block h3 code { font-family:var(--mono); font-size:0.8em; background:var(--slate-3); border-radius:4px; padding:2px 7px; }
+  .keys-only-block .sub { margin-top:var(--space-sm); }
+  .keys-only-block .sub code { font-family:var(--mono); font-size:0.85em; background:var(--slate-3); border-radius:4px; padding:1px 5px; }
+  .keys-only-block .fam-term { max-width:640px; }
 
   /* install */
   #install { background:var(--slate-2); border-block:var(--border); }
@@ -657,6 +663,30 @@ Corpus: 5 artifacts · 12 distinct primitives · 34 observations
           <img src="peek-re.png" alt="Peek in RE mode — the mascot suited up with a scanner cannon and targeting reticle for hunting through binaries">
           <figcaption>Peek, in RE mode.</figcaption>
         </figure>
+      </div>
+
+      <div class="keys-only-block">
+        <h3>Same engine, pointed at secrets: <code>--keys-only</code></h3>
+        <p class="sub">The faction engine doesn't care what it's clustering. Point it at a folder of
+        <code>.env</code> files with <code>--keys-only</code> and it compares them by <em>key schema</em>,
+        not values — dropping the value from every <code>key=value</code> pair and hashing raw lines, so
+        <strong>no secret ever enters the output</strong>. It's the "which environment is missing a key,
+        which profiles share an auth shape?" audit, safe to run on real credentials.</p>
+        <div class="fam-term" aria-label="wtd keys-only faction output on env files">
+          <pre><span class="dim">$</span> <span class="hd">wtd ./environments --keys-only --factions</span>
+
+<span class="hd">Factions</span> <span class="dim">(groups sharing the same key schema)</span>
+  <span class="fa">faction of 3 · cohesion 1.00</span>
+    <span class="fa">members: prod.env, staging.env, dev.env</span>
+    shared: kv DATABASE_URL   <span class="dim">(3/3 members)</span>
+    shared: kv CLIENT_ID      <span class="dim">(3/3 members)</span>
+    shared: kv CLIENT_SECRET  <span class="dim">(3/3 members)</span>
+  <span class="fb">faction of 2 · cohesion 1.00</span>
+    <span class="fb">members: db-primary.env, db-replica.env</span>
+    shared: kv USER_NAME      <span class="dim">(2/2 members)</span>
+    shared: kv PASS           <span class="dim">(2/2 members)</span>
+<span class="dim">— key names only; every value dropped before the report is built.</span></pre>
+        </div>
       </div>
     </div>
   </section>
