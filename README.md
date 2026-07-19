@@ -14,6 +14,8 @@
 [![Platforms](https://img.shields.io/badge/platforms-Linux%20·%20macOS%20·%20Windows-informational)](#-quick-start)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
+[![Tip my tokens](https://tokentip.to/badge/copyleftdev.svg?logo=1)](https://tokentip.to/@copyleftdev)
+
 </div>
 
 Point WTD at **N artifacts** — configs, JSON, YAML, Markdown, logs, anything text —
